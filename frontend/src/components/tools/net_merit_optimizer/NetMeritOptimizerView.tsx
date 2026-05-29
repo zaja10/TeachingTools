@@ -62,7 +62,7 @@ const NetMeritOptimizerView: React.FC = () => {
       setWeights(newWeights);
     } else {
       newSelected.add(trait);
-      setWeights({ ...weights, [trait]: 1 }); // Default weight of 1
+      setWeights({ ...weights, [trait]: 0 }); // Default weight of 0
     }
     setSelectedTraits(newSelected);
   };
@@ -305,16 +305,50 @@ const NetMeritOptimizerView: React.FC = () => {
             </h3>
             {isDataIngestionOpen && (
               <>
-                <label className="btn-primary" style={{ textAlign: 'center', cursor: 'pointer' }}>
-                  Upload .csv / .xlsx
-                  <input 
-                    type="file" 
-                    accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
-                    style={{ display: 'none' }} 
-                    onChange={handleFileUpload}
-                    ref={fileInputRef}
-                  />
-                </label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <label className="btn-primary" style={{ textAlign: 'center', cursor: 'pointer', flex: 1 }}>
+                    Upload .csv / .xlsx
+                    <input 
+                      type="file" 
+                      accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+                      style={{ display: 'none' }} 
+                      onChange={handleFileUpload}
+                      ref={fileInputRef}
+                    />
+                  </label>
+                  <button
+                    style={{ 
+                      flex: 1, 
+                      background: 'var(--bg-surface)', 
+                      border: '1px solid var(--border-light)', 
+                      color: 'var(--text-primary)', 
+                      borderRadius: '4px', 
+                      cursor: 'pointer', 
+                      fontWeight: 'bold', 
+                      padding: '0.5rem' 
+                    }}
+                    onClick={async () => {
+                      setError(null);
+                      try {
+                        const response = await fetch('./Tested.parentSelectionFile07.09.2025.xlsx');
+                        if (!response.ok) throw new Error("Failed to fetch example file");
+                        const blob = await response.blob();
+                        const file = new File([blob], "Tested.parentSelectionFile07.09.2025.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                        const parsedData = await parseFile(file);
+                        if (parsedData.length === 0) throw new Error("The example file is empty.");
+                        const numericTraits = extractNumericTraits(parsedData);
+                        setData(parsedData);
+                        setTraits(numericTraits);
+                        setSelectedTraits(new Set());
+                        setWeights({});
+                      } catch (err: any) {
+                        setError(err.message || "Failed to load example file.");
+                      }
+                    }}
+                  >
+                    Load Example
+                  </button>
+                </div>
                 {error && <span style={{ color: 'var(--color-danger)', fontSize: '0.875rem' }}>{error}</span>}
                 {data.length > 0 && <span style={{ color: 'var(--color-success)', fontSize: '0.875rem' }}>Loaded {data.length} lines.</span>}
               </>
@@ -370,7 +404,19 @@ const NetMeritOptimizerView: React.FC = () => {
 
           {selectedTraits.size > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, overflowY: 'auto' }}>
-              <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1rem' }}>Dynamic Weights</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1rem' }}>Dynamic Weights</h3>
+                <button 
+                  onClick={() => {
+                    const newWeights = { ...weights };
+                    Object.keys(newWeights).forEach(k => newWeights[k] = 0);
+                    setWeights(newWeights);
+                  }}
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                >
+                  Reset All
+                </button>
+              </div>
               {Array.from(selectedTraits).map(trait => (
                 <label key={trait} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -380,18 +426,18 @@ const NetMeritOptimizerView: React.FC = () => {
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button 
                       type="button"
-                      onClick={() => handleWeightChange(trait, parseFloat(((weights[trait] || 0) - 0.1).toFixed(1)))}
+                      onClick={() => handleWeightChange(trait, parseFloat(((weights[trait] || 0) - 0.01).toFixed(2)))}
                       style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-primary)', cursor: 'pointer', padding: '0 6px', borderRadius: '4px' }}
                     >-</button>
                     <input 
-                      type="range" min="-10" max="10" step="0.1"
+                      type="range" min="-10" max="10" step="0.01"
                       value={weights[trait] || 0} 
                       onChange={e => handleWeightChange(trait, parseFloat(e.target.value))} 
                       style={{ accentColor: 'var(--color-accent)', flex: 1 }}
                     />
                     <button 
                       type="button"
-                      onClick={() => handleWeightChange(trait, parseFloat(((weights[trait] || 0) + 0.1).toFixed(1)))}
+                      onClick={() => handleWeightChange(trait, parseFloat(((weights[trait] || 0) + 0.01).toFixed(2)))}
                       style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-primary)', cursor: 'pointer', padding: '0 6px', borderRadius: '4px' }}
                     >+</button>
                   </div>
@@ -488,6 +534,12 @@ const NetMeritOptimizerView: React.FC = () => {
             </div>
             {isTopLinesOpen && (
               <>
+                {filteredTopLines.length > 0 && Array.from(selectedTraits).every(t => !weights[t]) && (
+                  <div style={{ padding: '0.5rem 1rem', color: '#fbbf24', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>⚠️</span> 
+                    All trait weights are 0. Lines are tied, so the top selected lines are simply chosen based on their original order in the uploaded file.
+                  </div>
+                )}
                 <div style={{ padding: '0 1rem 0.5rem' }}>
                   <input 
                     type="text" 
