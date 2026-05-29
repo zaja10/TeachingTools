@@ -79,21 +79,48 @@ const NetMeritOptimizerView: React.FC = () => {
 
     const traitsArray = Array.from(selectedTraits);
     
-    // Calculate population means for each trait
+    // Calculate population means and standard deviations for each trait (handling missing values)
     const popMeans: Record<string, number> = {};
+    const popStdDevs: Record<string, number> = {};
+    
     traitsArray.forEach(t => {
-      const sum = data.reduce((acc, row) => acc + (row[t] || 0), 0);
-      popMeans[t] = sum / data.length;
+      let sum = 0;
+      let count = 0;
+      data.forEach(row => {
+        const val = row[t];
+        if (typeof val === 'number') {
+          sum += val;
+          count++;
+        }
+      });
+      const mean = count > 0 ? sum / count : 0;
+      popMeans[t] = mean;
+      
+      let sumSqDiff = 0;
+      data.forEach(row => {
+        const val = row[t];
+        if (typeof val === 'number') {
+          sumSqDiff += Math.pow(val - mean, 2);
+        }
+      });
+      // Sample standard deviation (n-1)
+      const variance = count > 1 ? sumSqDiff / (count - 1) : 0;
+      popStdDevs[t] = Math.sqrt(variance) || 1; // Fallback to 1 to avoid division by zero
     });
 
-    // Compute Net Merit Index for each line
+    // Compute Net Merit Index for each line using standardized values (Z-scores)
     const scoredData = data.map((row, index) => {
       let score = 0;
       let equalWeightScore = 0;
       traitsArray.forEach(t => {
-        const val = row[t] || 0;
-        score += val * (weights[t] || 0);
-        equalWeightScore += val * 1; // equal weights for RE baseline
+        let val = row[t];
+        // If missing, impute with mean (which makes stdVal = 0, contributing 0 to the sum)
+        if (typeof val !== 'number') {
+          val = popMeans[t];
+        }
+        const stdVal = (val - popMeans[t]) / popStdDevs[t];
+        score += stdVal * (weights[t] || 0);
+        equalWeightScore += stdVal * 1; // equal weights for RE baseline
       });
       return { ...row, _originalIndex: index, _netMeritScore: score, _equalWeightScore: equalWeightScore };
     });
@@ -105,12 +132,21 @@ const NetMeritOptimizerView: React.FC = () => {
     const numToSelect = Math.max(1, Math.round((selectionIntensity / 100) * data.length));
     const topLines = scoredData.slice(0, numToSelect);
 
-    // Calculate Delta G for each trait (Mean Selected - Mean Population)
+    // Calculate Delta G for each trait (in standard deviation units)
     const deltaG: Record<string, number> = {};
     traitsArray.forEach(t => {
-      const selectedSum = topLines.reduce((acc, row) => acc + ((row as DataRow)[t] || 0), 0);
-      const selectedMean = selectedSum / topLines.length;
-      deltaG[t] = selectedMean - popMeans[t];
+      let selectedSum = 0;
+      let count = 0;
+      topLines.forEach(row => {
+        const val = (row as DataRow)[t];
+        if (typeof val === 'number') {
+          selectedSum += val;
+          count++;
+        }
+      });
+      const selectedMean = count > 0 ? selectedSum / count : popMeans[t];
+      const rawDeltaG = selectedMean - popMeans[t];
+      deltaG[t] = rawDeltaG / popStdDevs[t];
     });
 
     // Relative Efficiency Calculation
@@ -183,7 +219,7 @@ const NetMeritOptimizerView: React.FC = () => {
     const lines: string[] = [];
     
     // Metadata section
-    lines.push("--- WEIGHTS AND DELTA G ---");
+    lines.push("--- WEIGHTS AND DELTA G (STD DEV UNITS) ---");
     lines.push(["Trait", "Weight", "Delta G"].join(","));
     traitsArray.forEach(t => {
       lines.push([
@@ -411,7 +447,7 @@ const NetMeritOptimizerView: React.FC = () => {
                     plot_bgcolor: 'rgba(0,0,0,0)',
                     font: { color: '#475569' },
                     xaxis: { 
-                      title: { text: plotMode === 'deltaG' ? 'ΔG (Selected Mean - Pop Mean)' : 'Net Merit Score' }, 
+                      title: { text: plotMode === 'deltaG' ? 'ΔG (Standard Deviation Units)' : 'Net Merit Score' }, 
                       gridcolor: '#e2e8f0', 
                       zerolinecolor: '#94a3b8' 
                     },
@@ -523,15 +559,23 @@ const NetMeritOptimizerView: React.FC = () => {
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem' }}>
             <div>
-              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>Net Merit Index (I)</h4>
+              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>1. Trait Standardization (Z-Score)</h4>
               <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <code>I = Σ (Trait_i × Weight_i)</code><br />
-                The score calculated for each individual line by summing the product of each selected trait value and its user-defined weight.
+                <code>Z_i = (X_i - μ) / σ</code><br />
+                Traits are standardized using their population mean (<code>μ</code>) and sample standard deviation (<code>σ</code>). Missing values are safely imputed with the population mean so they yield a neutral Z-score of 0. This ensures that traits measured in different units (e.g., thousands vs decimals) are scaled equally.
+              </p>
+            </div>
+
+            <div>
+              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>2. Net Merit Index (I)</h4>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                <code>I = Σ (Z_i × Weight_i)</code><br />
+                The score calculated for each individual line by summing the product of each selected trait's standardized value (<code>Z_i</code>) and its user-defined relative weight.
               </p>
             </div>
             
             <div>
-              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>Selection Intensity</h4>
+              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>3. Selection Intensity</h4>
               <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 Determines the top percentage of lines to retain based on their Net Merit Index.<br />
                 <em>Note: If you are uploading a dataset containing lines that are <strong>already selected</strong>, you can set this slider to 100% to evaluate the entire uploaded cohort without filtering any out.</em>
@@ -539,18 +583,18 @@ const NetMeritOptimizerView: React.FC = () => {
             </div>
             
             <div>
-              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>Genetic Gain (ΔG)</h4>
+              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>4. Genetic Gain (ΔG)</h4>
               <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <code>ΔG = μ_selected - μ_population</code><br />
-                The difference between the mean of the selected lines and the mean of the entire uploaded population for each trait.
+                <code>ΔG = (μ_selected - μ_population) / σ_population</code><br />
+                The expected response to selection, representing the difference between the mean of the selected lines and the mean of the entire uploaded population. This is calculated and expressed in standard deviation units to allow direct comparison of gain across all traits.
               </p>
             </div>
 
             <div>
-              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>Relative Efficiency (RE²)</h4>
+              <h4 style={{ color: 'var(--color-accent)', margin: '0 0 0.5rem 0' }}>5. Relative Efficiency (RE²)</h4>
               <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 <code>RE² = Variance(Custom Index) / Variance(Equal-Weights Index)</code><br />
-                Measures how much the variance of your custom-weighted index differs from a baseline model where all selected traits are given a weight of 1.
+                Measures how much the variance of your custom-weighted index differs from a baseline model where all selected traits are given an equal weight of 1.
               </p>
             </div>
           </div>
