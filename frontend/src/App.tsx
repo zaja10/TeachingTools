@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { BookOpen, Activity, Dna, LayoutDashboard, Database } from 'lucide-react';
 import { ToolRegistry } from './config/toolRegistry';
 
