@@ -19,5 +19,12 @@ export const ToolRegistry = [
     category: "Experimental Design",
     path: "/tools/hasse-designer",
     component: "hasse_designer/HasseDesignerView"
+  },
+  {
+    id: "net-merit-optimizer",
+    title: "Net Merit Index Optimizer",
+    category: "Quantitative Genetics",
+    path: "/tools/net-merit-optimizer",
+    component: "net_merit_optimizer/NetMeritOptimizerView"
   }
 ];

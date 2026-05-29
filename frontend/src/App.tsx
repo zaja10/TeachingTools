@@ -9,7 +9,8 @@ import { ToolRegistry } from './config/toolRegistry';
 const componentMap: Record<string, React.LazyExoticComponent<any>> = {
   "breeders_equation/BreedersEquationView": React.lazy(() => import('./components/tools/breeders_equation/BreedersEquationView')),
   "lmm_visualizer/LmmVisualizerView": React.lazy(() => import('./components/tools/lmm_visualizer/LmmVisualizerView')),
-  "hasse_designer/HasseDesignerView": React.lazy(() => import('./components/tools/hasse_designer/HasseDesignerView'))
+  "hasse_designer/HasseDesignerView": React.lazy(() => import('./components/tools/hasse_designer/HasseDesignerView')),
+  "net_merit_optimizer/NetMeritOptimizerView": React.lazy(() => import('./components/tools/net_merit_optimizer/NetMeritOptimizerView'))
 };
 
 const loadComponent = (componentPath: string) => {
@@ -31,22 +32,31 @@ const getIcon = (id: string) => {
 };
 
 function AppShell() {
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
   return (
     <Router>
       <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
         
         {/* Sidebar Navigation */}
-        <aside style={{ 
-          width: '280px', 
-          borderRight: '1px solid var(--border-light)', 
-          padding: '2rem 1.5rem', 
-          display: 'flex', 
-          flexDirection: 'column',
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
-          zIndex: 10
-        }}>
-          <NavLink to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem' }}>
+        <aside 
+          onMouseEnter={() => setIsSidebarOpen(true)}
+          onMouseLeave={() => setIsSidebarOpen(false)}
+          style={{ 
+            width: isSidebarOpen ? '280px' : '80px', 
+            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            borderRight: '1px solid var(--border-light)', 
+            padding: '2rem 1rem', 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: isSidebarOpen ? 'stretch' : 'center',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
+            zIndex: 10,
+            overflowX: 'hidden'
+          }}
+        >
+          <NavLink to="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem', width: '100%', justifyContent: isSidebarOpen ? 'flex-start' : 'center' }}>
               <div style={{ 
                 background: 'linear-gradient(135deg, var(--color-accent), #6366f1)',
                 borderRadius: '8px',
@@ -54,29 +64,48 @@ function AppShell() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 15px var(--color-accent-glow)'
+                boxShadow: '0 0 15px var(--color-accent-glow)',
+                flexShrink: 0
               }}>
                 <Dna size={24} color="white" />
               </div>
-              <div>
-                <h1 style={{ fontSize: '1.25rem', margin: 0, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>QGen Hub</h1>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Quantitative Genetics</p>
+              <div style={{ 
+                opacity: isSidebarOpen ? 1 : 0, 
+                width: isSidebarOpen ? 'auto' : 0, 
+                overflow: 'hidden', 
+                transition: 'opacity 0.3s' 
+              }}>
+                <h1 style={{ fontSize: '1.25rem', margin: 0, letterSpacing: '-0.02em', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>QGen Hub</h1>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, whiteSpace: 'nowrap' }}>Quantitative Genetics</p>
               </div>
             </div>
           </NavLink>
 
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto' }}>
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem', marginLeft: '0.5rem' }}>
-              Simulators & Models
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto', overflowX: 'hidden', width: '100%' }}>
+            <div style={{ 
+              fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', 
+              marginBottom: '0.5rem', textAlign: isSidebarOpen ? 'left' : 'center',
+              opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.3s'
+            }}>
+              {isSidebarOpen ? 'Simulators & Models' : '•'}
             </div>
             {ToolRegistry.map((tool) => (
               <NavLink 
                 key={tool.id} 
                 to={tool.path}
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                title={tool.title}
+                style={{ justifyContent: isSidebarOpen ? 'flex-start' : 'center', padding: isSidebarOpen ? '0.75rem 1rem' : '0.75rem 0' }}
               >
-                {getIcon(tool.id)}
-                <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{tool.title}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px' }}>
+                  {getIcon(tool.id)}
+                </div>
+                <span style={{ 
+                  fontWeight: 500, fontSize: '0.9rem', whiteSpace: 'nowrap',
+                  opacity: isSidebarOpen ? 1 : 0, width: isSidebarOpen ? 'auto' : 0, overflow: 'hidden', transition: 'opacity 0.3s'
+                }}>
+                  {tool.title}
+                </span>
               </NavLink>
             ))}
           </nav>
