@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Database, MousePointerClick, Settings, Activity, HelpCircle, X } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Database, MousePointerClick, Settings, Activity, HelpCircle, X, Upload, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { InteractiveEllipse } from './InteractiveEllipse';
 
 const API_BASE = 'http://127.0.0.1:8000/api/v1/tools/open_index_gen';
@@ -18,6 +18,11 @@ export default function OpenIndexGenView() {
   const [alpha, setAlpha] = useState<number>(0.5);
   const cycles = 1;
   
+  // Dataset State
+  const [datasetName, setDatasetName] = useState<string>("Tested.parentSelectionFile07.09.2025.xlsx");
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Visualization State
   const [showIsoeconomic, setShowIsoeconomic] = useState<boolean>(false);
   const [showHelp, setShowHelp] = useState<boolean>(false);
@@ -30,15 +35,17 @@ export default function OpenIndexGenView() {
   const [error, setError] = useState<string | null>(null);
 
   // 1. Fetch available traits
-  useEffect(() => {
+  const fetchTraits = useCallback(() => {
     fetch(`${API_BASE}/dataset/traits`)
       .then(r => r.json())
       .then(data => {
         if (data.traits) {
           setAvailableTraits(data.traits);
-          // Default to first 4 traits to show off the matrix
-          if (data.traits.length >= 4) {
-            const initial = data.traits.slice(0, 4);
+          
+          // Select default traits or cap at what's available
+          const numDefaults = Math.min(data.traits.length, 4);
+          if (numDefaults > 0) {
+            const initial = data.traits.slice(0, numDefaults);
             setSelectedTraits(initial);
             
             const initW: Record<string, number> = {};
@@ -52,11 +59,61 @@ export default function OpenIndexGenView() {
             setEconomicWeights(initW);
             setDesiredGains(initD);
             setRestrictedTraits(initR);
+          } else {
+            setSelectedTraits([]);
+            setEllipseDataMap({});
           }
         }
       })
       .catch(e => setError("Failed to load traits: " + e.message));
   }, []);
+
+  useEffect(() => {
+    fetchTraits();
+  }, [fetchTraits]);
+
+  // Handle Dataset Upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setError(null);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${API_BASE}/dataset/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.message);
+      
+      setDatasetName(file.name);
+      fetchTraits();
+    } catch(e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleResetDataset = async () => {
+    setIsUploading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/dataset/reset`, { method: 'POST' });
+      if (!res.ok) throw new Error("Failed to reset dataset");
+      setDatasetName("Tested.parentSelectionFile07.09.2025.xlsx");
+      fetchTraits();
+    } catch(e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Handle trait selection toggles
   const handleTraitToggle = (t: string) => {
@@ -297,6 +354,40 @@ export default function OpenIndexGenView() {
           <HelpCircle size={16} /> How is the math calculated?
         </button>
       </header>
+
+      {/* Dataset Management Banner */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', padding: '1rem 1.5rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-primary)' }}>
+          <FileSpreadsheet size={20} color="var(--color-accent)" />
+          <span>Active Dataset: <strong style={{ fontFamily: 'monospace' }}>{datasetName}</strong></span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <input 
+            type="file" 
+            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            style={{ display: 'none' }} 
+          />
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'var(--color-accent)', color: 'white', borderRadius: '4px', cursor: isUploading ? 'not-allowed' : 'pointer', border: 'none', fontSize: '0.85rem' }}
+          >
+            <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload Custom BLUPs'}
+          </button>
+          
+          {datasetName !== "Tested.parentSelectionFile07.09.2025.xlsx" && (
+            <button 
+              onClick={handleResetDataset}
+              disabled={isUploading}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)', borderRadius: '4px', cursor: isUploading ? 'not-allowed' : 'pointer', border: '1px solid var(--border-light)', fontSize: '0.85rem' }}
+            >
+              <RefreshCw size={16} /> Reset to Example
+            </button>
+          )}
+        </div>
+      </div>
 
       {showHelp && (
         <div style={{ padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', position: 'relative' }}>

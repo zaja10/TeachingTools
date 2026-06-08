@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, validator
 from typing import List, Optional
 import pandas as pd
+import numpy as np
+import io
 import numpy as np
 from app.core.open_index_gen_engine import OpenIndexGenEngine
 
@@ -9,11 +11,40 @@ router = APIRouter()
 engine = OpenIndexGenEngine()
 
 DATASET_PATH = r"c:\Users\Zac\Documents\Antigravity\TeachingTools\Tested.parentSelectionFile07.09.2025.xlsx"
+CURRENT_DATAFRAME: Optional[pd.DataFrame] = None
+
+def get_active_dataframe() -> pd.DataFrame:
+    global CURRENT_DATAFRAME
+    if CURRENT_DATAFRAME is not None:
+        return CURRENT_DATAFRAME
+    return pd.read_excel(DATASET_PATH, sheet_name=0)
+
+@router.post("/dataset/upload")
+async def upload_dataset(file: UploadFile = File(...)):
+    global CURRENT_DATAFRAME
+    try:
+        contents = await file.read()
+        filename = file.filename.lower()
+        if filename.endswith('.csv'):
+            CURRENT_DATAFRAME = pd.read_csv(io.BytesIO(contents))
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            CURRENT_DATAFRAME = pd.read_excel(io.BytesIO(contents))
+        else:
+            raise ValueError("Unsupported file format. Please upload CSV or Excel.")
+        return {"status": "success", "message": f"Successfully loaded {file.filename}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/dataset/reset")
+async def reset_dataset():
+    global CURRENT_DATAFRAME
+    CURRENT_DATAFRAME = None
+    return {"status": "success", "message": "Reverted to default dataset"}
 
 @router.get("/dataset/traits")
 async def get_traits():
     try:
-        df = pd.read_excel(DATASET_PATH, sheet_name=0)
+        df = get_active_dataframe()
         # Filter for numeric columns that are likely traits/BLUPs
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         # Exclude metadata-like columns
@@ -29,7 +60,7 @@ class TraitList(BaseModel):
 @router.post("/dataset/matrix")
 async def get_covariance_matrix(data: TraitList):
     try:
-        df = pd.read_excel(DATASET_PATH, sheet_name=0)
+        df = get_active_dataframe()
         selected_df = df[data.traits].dropna()
         if selected_df.empty:
             raise ValueError("No data available for the selected traits after dropping NaNs.")
