@@ -177,7 +177,7 @@ export default function OpenIndexGenView() {
 
   const loadDefaultDataset = useCallback(async () => {
     try {
-      const response = await fetch('./Tested.parentSelectionFile07.09.2025.xlsx');
+      const response = await fetch('/Tested.parentSelectionFile07.09.2025.xlsx');
       if (!response.ok) throw new Error("Failed to fetch default dataset");
       const blob = await response.blob();
       await loadDatasetFile(blob, "Tested.parentSelectionFile07.09.2025.xlsx");
