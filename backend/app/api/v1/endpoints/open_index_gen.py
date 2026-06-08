@@ -48,12 +48,32 @@ class MatrixInput(BaseModel):
     alpha: Optional[float] = None
     alpha_proportion: Optional[float] = None
     cycles: Optional[int] = 0
+    ellipse_axes: Optional[List[int]] = None
 
     @validator('method')
     def method_must_be_valid(cls, value):
         if value not in ['unrestricted', 'restricted', 'desired_gains', 'pure_desired_gains']:
             raise ValueError("Method must be 'unrestricted', 'restricted', 'desired_gains', or 'pure_desired_gains'")
         return value
+
+class EllipseInput(BaseModel):
+    G: List[List[float]]
+    target_x: Optional[float] = None
+    target_y: Optional[float] = None
+
+@router.post("/ellipse_module")
+def ellipse_module(inputs: EllipseInput):
+    """
+    GENUP Interactive Ellipse Module endpoint.
+    If target_x and target_y are provided, reverse-engineers the weights.
+    Otherwise, returns the ellipse boundary sweep.
+    """
+    G = np.array(inputs.G)
+    
+    if inputs.target_x is not None and inputs.target_y is not None:
+        return OpenIndexGenEngine.reverse_genup_ellipse(G, inputs.target_x, inputs.target_y)
+    else:
+        return OpenIndexGenEngine.generate_genup_ellipse(G)
 
 @router.post("/simulate")
 async def simulate_index(data: MatrixInput):

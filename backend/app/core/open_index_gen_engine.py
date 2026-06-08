@@ -201,6 +201,29 @@ class OpenIndexGenEngine(TeachingEngine):
             response["weights"] = b.flatten().tolist()
             response["predicted_genetic_change"] = delta_G.flatten().tolist()
             
+            # Generate 2D Ellipse if requested
+            ellipse_axes = inputs.get('ellipse_axes')
+            if ellipse_axes is not None and len(ellipse_axes) == 2:
+                idx_x, idx_y = ellipse_axes
+                # Extract 2x2 submatrix
+                G2 = G[np.ix_(ellipse_axes, ellipse_axes)]
+                
+                # Calculate ellipse points: x' G2^-1 x = 1
+                # Use eigenvalue decomposition
+                evals, evecs = np.linalg.eigh(G2)
+                t = np.linspace(0, 2 * np.pi, 100)
+                
+                # Ensure eigenvalues are positive to avoid math errors
+                evals = np.maximum(evals, 1e-10)
+                
+                x_pts = np.sqrt(evals[0]) * evecs[0, 0] * np.cos(t) + np.sqrt(evals[1]) * evecs[0, 1] * np.sin(t)
+                y_pts = np.sqrt(evals[0]) * evecs[1, 0] * np.cos(t) + np.sqrt(evals[1]) * evecs[1, 1] * np.sin(t)
+                
+                response["ellipse"] = {
+                    "x": x_pts.tolist(),
+                    "y": y_pts.tolist()
+                }
+            
             # Simulate generations if cycles provided
             cycles = int(inputs.get('cycles', 0))
             if cycles > 0:
@@ -221,6 +244,68 @@ class OpenIndexGenEngine(TeachingEngine):
                 "status": "error",
                 "message": str(e)
             }
+
+    @staticmethod
+    def generate_genup_ellipse(G: np.ndarray, num_points: int = 100) -> dict:
+        """
+        Generates the possible selection responses ellipse by sweeping v.
+        If G is 2x2, returns {"x": [...], "y": [...]}.
+        If G is NxN, returns a dict of {"i_j": {"x": [...], "y": [...]}} for all i < j.
+        """
+        N = G.shape[0]
+        if N == 2:
+            return OpenIndexGenEngine._generate_2d_ellipse(G, num_points)
+            
+        result = {}
+        for i in range(N):
+            for j in range(i + 1, N):
+                G2 = G[np.ix_([i, j], [i, j])]
+                result[f"{i}_{j}"] = OpenIndexGenEngine._generate_2d_ellipse(G2, num_points)
+        return result
+
+    @staticmethod
+    def _generate_2d_ellipse(G: np.ndarray, num_points: int) -> dict:
+        P = G
+        theta = np.linspace(0, 2*np.pi, num_points)
+        x_pts = []
+        y_pts = []
+        for t in theta:
+            v = np.array([np.cos(t), np.sin(t)])
+            b = v
+            var_I = b.T @ P @ b
+            if var_I > 1e-12:
+                sigma_I = np.sqrt(var_I)
+                dg = (G @ b) / sigma_I
+                x_pts.append(dg[0])
+                y_pts.append(dg[1])
+        return {"x": x_pts, "y": y_pts}
+
+    @staticmethod
+    def reverse_genup_ellipse(G: np.ndarray, target_x: float, target_y: float) -> dict:
+        """
+        Reverse-engineers economic weights (v) and index weights (b) 
+        given a clicked target point (Delta G) on the boundary.
+        """
+        target_dg = np.array([target_x, target_y])
+        G_inv = np.linalg.inv(G)
+        v_rev = G_inv @ target_dg
+        norm = np.linalg.norm(v_rev)
+        if norm > 1e-12:
+            v_rev = v_rev / norm
+            
+        b_rev = v_rev
+        sigma_I = np.sqrt(b_rev.T @ G @ b_rev)
+        dg_rev = (G @ b_rev) / sigma_I
+        
+        # Isoeconomic line: v1*x + v2*y = H => y = (H - v1*x)/v2
+        H = v_rev @ dg_rev
+        
+        return {
+            "v": v_rev.tolist(),
+            "b": b_rev.tolist(),
+            "delta_G": dg_rev.tolist(),
+            "H": float(H)
+        }
 
     def evaluate(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Not yet implemented for OpenIndexGen."""
