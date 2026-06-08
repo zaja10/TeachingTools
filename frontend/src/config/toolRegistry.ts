@@ -26,5 +26,12 @@ export const ToolRegistry = [
     category: "Quantitative Genetics",
     path: "/tools/net-merit-optimizer",
     component: "net_merit_optimizer/NetMeritOptimizerView"
+  },
+  {
+    id: "open-index-gen",
+    title: "Selection Index Generator",
+    category: "Quantitative Genetics",
+    path: "/tools/open-index-gen",
+    component: "open_index_gen/OpenIndexGenView"
   }
 ];

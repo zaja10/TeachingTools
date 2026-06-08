@@ -161,7 +161,25 @@ class OpenIndexGenEngine(TeachingEngine):
             elif method == 'desired_gains':
                 restrict_idx = inputs.get('restrict_idx', [])
                 delta = np.array(inputs.get('delta', []), dtype=float).reshape(-1, 1)
-                alpha = float(inputs.get('alpha', 0.0))
+                
+                # We will first calculate alpha_max using a dummy call if needed, but wait:
+                # calc_desired_gains computes alpha_max inside.
+                # Let's pass alpha_proportion to calc_desired_gains if provided.
+                alpha_prop = inputs.get('alpha_proportion')
+                if alpha_prop is not None:
+                    # We need to compute alpha_max first
+                    P_inv = np.linalg.pinv(P)
+                    G1 = G[:, restrict_idx]
+                    term1 = G1.T @ P_inv @ G1
+                    term1_inv = np.linalg.pinv(term1)
+                    alpha_max_sq_inv = delta.T @ term1_inv @ delta
+                    if alpha_max_sq_inv > 0:
+                        computed_alpha_max = 1.0 / np.sqrt(alpha_max_sq_inv.item())
+                        alpha = float(alpha_prop) * computed_alpha_max
+                    else:
+                        alpha = 0.0
+                else:
+                    alpha = float(inputs.get('alpha', 0.0))
                 
                 if not restrict_idx or delta.size == 0:
                     raise ValueError("restrict_idx and delta must be provided for desired gains.")
@@ -182,6 +200,19 @@ class OpenIndexGenEngine(TeachingEngine):
             
             response["weights"] = b.flatten().tolist()
             response["predicted_genetic_change"] = delta_G.flatten().tolist()
+            
+            # Simulate generations if cycles provided
+            cycles = int(inputs.get('cycles', 0))
+            if cycles > 0:
+                generation_data = []
+                current_g = np.zeros_like(delta_G)
+                for i in range(cycles + 1):
+                    generation_data.append({
+                        "generation": i,
+                        "cumulative_genetic_change": current_g.flatten().tolist()
+                    })
+                    current_g += delta_G
+                response["generation_data"] = generation_data
             
             return response
             

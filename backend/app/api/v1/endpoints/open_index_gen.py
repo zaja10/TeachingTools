@@ -1,10 +1,42 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, validator
 from typing import List, Optional
+import pandas as pd
+import numpy as np
 from app.core.open_index_gen_engine import OpenIndexGenEngine
 
 router = APIRouter()
 engine = OpenIndexGenEngine()
+
+DATASET_PATH = r"c:\Users\Zac\Documents\Antigravity\TeachingTools\Tested.parentSelectionFile07.09.2025.xlsx"
+
+@router.get("/dataset/traits")
+async def get_traits():
+    try:
+        df = pd.read_excel(DATASET_PATH, sheet_name=0)
+        # Filter for numeric columns that are likely traits/BLUPs
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        # Exclude metadata-like columns
+        exclude = ['Unnamed: 0', 'cohort']
+        traits = [col for col in numeric_cols if col not in exclude]
+        return {"traits": traits}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class TraitList(BaseModel):
+    traits: List[str]
+
+@router.post("/dataset/matrix")
+async def get_covariance_matrix(data: TraitList):
+    try:
+        df = pd.read_excel(DATASET_PATH, sheet_name=0)
+        selected_df = df[data.traits].dropna()
+        if selected_df.empty:
+            raise ValueError("No data available for the selected traits after dropping NaNs.")
+        cov_matrix = selected_df.cov().values.tolist()
+        return {"covariance_matrix": cov_matrix, "traits": data.traits}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 class MatrixInput(BaseModel):
     method: str
@@ -14,6 +46,8 @@ class MatrixInput(BaseModel):
     restrict_idx: Optional[List[int]] = None
     delta: Optional[List[float]] = None
     alpha: Optional[float] = None
+    alpha_proportion: Optional[float] = None
+    cycles: Optional[int] = 0
 
     @validator('method')
     def method_must_be_valid(cls, value):
