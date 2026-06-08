@@ -41,16 +41,36 @@ function calculateCovarianceForTraits(data: Record<string, number[]>, traits: st
     means[i] /= validN;
   }
 
+  const sds = Array(nTraits).fill(0);
+  for (let i = 0; i < nTraits; i++) {
+    let sumSq = 0;
+    for (let k = 0; k < validN; k++) {
+      sumSq += Math.pow(validRows[k][i] - means[i], 2);
+    }
+    sds[i] = Math.sqrt(sumSq / (validN - 1));
+  }
+
   for (let i = 0; i < nTraits; i++) {
     for (let j = 0; j <= i; j++) {
+      if (sds[i] === 0 || sds[j] === 0) {
+        const c = i === j ? 1 : 0;
+        cov[i][j] = c;
+        cov[j][i] = c;
+        continue;
+      }
       let sum = 0;
       for (let k = 0; k < validN; k++) {
-        sum += (validRows[k][i] - means[i]) * (validRows[k][j] - means[j]);
+        sum += ((validRows[k][i] - means[i]) / sds[i]) * ((validRows[k][j] - means[j]) / sds[j]);
       }
       const c = sum / (validN - 1);
       cov[i][j] = c;
       cov[j][i] = c;
     }
+  }
+
+  // Add a tiny ridge to ensure strictly positive definite matrix (prevents SVD infinite loops)
+  for (let i = 0; i < nTraits; i++) {
+    cov[i][i] += 1e-6;
   }
   return cov;
 }
