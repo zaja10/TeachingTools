@@ -1,12 +1,62 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Database, MousePointerClick, Settings, Activity, HelpCircle, X, Upload, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { InteractiveEllipse } from './InteractiveEllipse';
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
+import { OpenIndexGenEngine, type MethodType, type SimulationInput } from './OpenIndexGenEngine';
 
-const API_BASE = 'http://127.0.0.1:8000/api/v1/tools/open_index_gen';
+function calculateCovarianceForTraits(data: Record<string, number[]>, traits: string[]): number[][] {
+  const nTraits = traits.length;
+  if (nTraits === 0) return [];
+  
+  let N = data[traits[0]].length;
+  for (const t of traits) {
+    if (data[t].length < N) N = data[t].length;
+  }
 
-type MethodType = 'unrestricted' | 'restricted' | 'desired_gains' | 'pure_desired_gains';
+  const validRows: number[][] = [];
+  for (let k = 0; k < N; k++) {
+    let isValid = true;
+    const rowVals = [];
+    for (const t of traits) {
+      const val = data[t][k];
+      if (val === undefined || val === null || isNaN(val)) {
+        isValid = false;
+        break;
+      }
+      rowVals.push(val);
+    }
+    if (isValid) validRows.push(rowVals);
+  }
+
+  const validN = validRows.length;
+  if (validN <= 1) return Array.from({length: nTraits}, () => Array(nTraits).fill(0));
+
+  const cov = Array.from({length: nTraits}, () => Array(nTraits).fill(0));
+  const means = Array(nTraits).fill(0);
+  for (let i = 0; i < nTraits; i++) {
+    for (let k = 0; k < validN; k++) {
+      means[i] += validRows[k][i];
+    }
+    means[i] /= validN;
+  }
+
+  for (let i = 0; i < nTraits; i++) {
+    for (let j = 0; j <= i; j++) {
+      let sum = 0;
+      for (let k = 0; k < validN; k++) {
+        sum += (validRows[k][i] - means[i]) * (validRows[k][j] - means[j]);
+      }
+      const c = sum / (validN - 1);
+      cov[i][j] = c;
+      cov[j][i] = c;
+    }
+  }
+  return cov;
+}
 
 export default function OpenIndexGenView() {
+  const [fullData, setFullData] = useState<Record<string, number[]>>({});
   const [availableTraits, setAvailableTraits] = useState<string[]>([]);
   
   // N-Trait Multi-Select State
@@ -34,43 +84,111 @@ export default function OpenIndexGenView() {
   const [optimalB, setOptimalB] = useState<number[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. Fetch available traits
-  const fetchTraits = useCallback(() => {
-    fetch(`${API_BASE}/dataset/traits`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.traits) {
-          setAvailableTraits(data.traits);
-          
-          // Select default traits or cap at what's available
-          const numDefaults = Math.min(data.traits.length, 4);
-          if (numDefaults > 0) {
-            const initial = data.traits.slice(0, numDefaults);
-            setSelectedTraits(initial);
-            
-            const initW: Record<string, number> = {};
-            const initD: Record<string, number> = {};
-            const initR: Record<string, boolean> = {};
-            initial.forEach((t: string) => {
-              initW[t] = 1.0;
-              initD[t] = 0.5;
-              initR[t] = false;
-            });
-            setEconomicWeights(initW);
-            setDesiredGains(initD);
-            setRestrictedTraits(initR);
-          } else {
-            setSelectedTraits([]);
-            setEllipseDataMap({});
-          }
+  const processParsedData = (data: any[], filename: string) => {
+    if (data.length === 0) throw new Error("Dataset is empty");
+    const traitsMap: Record<string, number[]> = {};
+    const exclude = ['Unnamed: 0', 'cohort'];
+    
+    const firstRow = data[0];
+    const numericCols = Object.keys(firstRow).filter(k => 
+      !exclude.includes(k) && (typeof firstRow[k] === 'number' || !isNaN(parseFloat(firstRow[k])))
+    );
+    
+    numericCols.forEach(col => { traitsMap[col] = []; });
+    
+    data.forEach(row => {
+      numericCols.forEach(col => {
+        const val = row[col];
+        if (typeof val === 'number') {
+          traitsMap[col].push(val);
+        } else if (val !== undefined && val !== null && !isNaN(parseFloat(val))) {
+          traitsMap[col].push(parseFloat(val));
+        } else {
+          traitsMap[col].push(NaN); // Will be filtered out in calculateCovarianceForTraits
         }
-      })
-      .catch(e => setError("Failed to load traits: " + e.message));
+      });
+    });
+    
+    setFullData(traitsMap);
+    setDatasetName(filename);
+    
+    const available = Object.keys(traitsMap);
+    setAvailableTraits(available);
+    
+    const numDefaults = Math.min(available.length, 4);
+    if (numDefaults > 0) {
+      const initial = available.slice(0, numDefaults);
+      setSelectedTraits(initial);
+      
+      const initW: Record<string, number> = {};
+      const initD: Record<string, number> = {};
+      const initR: Record<string, boolean> = {};
+      initial.forEach(t => {
+        initW[t] = 1.0;
+        initD[t] = 0.5;
+        initR[t] = false;
+      });
+      setEconomicWeights(initW);
+      setDesiredGains(initD);
+      setRestrictedTraits(initR);
+    } else {
+      setSelectedTraits([]);
+      setEllipseDataMap({});
+    }
+  };
+
+  const loadDatasetFile = async (fileOrBlob: File | Blob, filename: string) => {
+    return new Promise<void>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          let parsedData: any[] = [];
+          
+          if (filename.toLowerCase().endsWith('.csv')) {
+            const text = new TextDecoder().decode(data as ArrayBuffer);
+            Papa.parse(text, {
+              header: true,
+              skipEmptyLines: true,
+              dynamicTyping: true,
+              complete: (results) => {
+                parsedData = results.data;
+                processParsedData(parsedData, filename);
+                resolve();
+              },
+              error: (err: any) => reject(new Error(err.message))
+            });
+          } else {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            parsedData = XLSX.utils.sheet_to_json(worksheet);
+            processParsedData(parsedData, filename);
+            resolve();
+          }
+        } catch(err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error("File read error"));
+      reader.readAsArrayBuffer(fileOrBlob);
+    });
+  };
+
+  const loadDefaultDataset = useCallback(async () => {
+    try {
+      const response = await fetch('./Tested.parentSelectionFile07.09.2025.xlsx');
+      if (!response.ok) throw new Error("Failed to fetch default dataset");
+      const blob = await response.blob();
+      await loadDatasetFile(blob, "Tested.parentSelectionFile07.09.2025.xlsx");
+    } catch(e: any) {
+      setError("Failed to load default dataset: " + e.message);
+    }
   }, []);
 
   useEffect(() => {
-    fetchTraits();
-  }, [fetchTraits]);
+    loadDefaultDataset();
+  }, [loadDefaultDataset]);
 
   // Handle Dataset Upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,21 +197,11 @@ export default function OpenIndexGenView() {
 
     setIsUploading(true);
     setError(null);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const res = await fetch(`${API_BASE}/dataset/upload`, {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || data.message);
-      
-      setDatasetName(file.name);
-      fetchTraits();
-    } catch(e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      await loadDatasetFile(file, file.name);
+    } catch(e: any) {
+      setError(e.message || String(e));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -104,18 +212,14 @@ export default function OpenIndexGenView() {
     setIsUploading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/dataset/reset`, { method: 'POST' });
-      if (!res.ok) throw new Error("Failed to reset dataset");
-      setDatasetName("Tested.parentSelectionFile07.09.2025.xlsx");
-      fetchTraits();
-    } catch(e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      await loadDefaultDataset();
+    } catch(e: any) {
+      setError(e.message || String(e));
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Handle trait selection toggles
   const handleTraitToggle = (t: string) => {
     setSelectedTraits(prev => {
       let next = [...prev];
@@ -126,7 +230,6 @@ export default function OpenIndexGenView() {
         next.push(t);
       }
       
-      // Ensure defaults exist
       setEconomicWeights(w => ({ ...w, [t]: w[t] ?? 1.0 }));
       setDesiredGains(d => ({ ...d, [t]: d[t] ?? 0.5 }));
       setRestrictedTraits(r => ({ ...r, [t]: r[t] ?? false }));
@@ -135,56 +238,35 @@ export default function OpenIndexGenView() {
     });
   };
 
-  // 2. Fetch G Matrix and Simulate when N-Trait state changes
-  const abortControllerRef = useRef<AbortController | null>(null);
-
+  // 2. Simulate when N-Trait state changes
   useEffect(() => {
     if (selectedTraits.length < 2) return;
     
-    const runSimulation = async () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
+    const runSimulation = () => {
       try {
         setError(null);
-        // Get G Matrix
-        const matRes = await fetch(`${API_BASE}/dataset/matrix`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ traits: selectedTraits }),
-          signal
-        });
-        const matData = await matRes.json();
-        if (!matRes.ok) throw new Error(matData.detail || "Failed to fetch matrix");
         
-        const G = matData.covariance_matrix;
+        // Compute Covariance Matrix locally!
+        const G = calculateCovarianceForTraits(fullData, selectedTraits);
         setGMatrix(G);
         
-        // Prepare simulation payload
         const restrictIdx: number[] = [];
         selectedTraits.forEach((t, i) => {
           if (restrictedTraits[t]) restrictIdx.push(i);
         });
         
-        let finalMethod = method as string;
+        let finalMethod = method;
         
-        // If they chose the standard index but didn't check any restrict boxes, 
-        // mathematically it is just an unrestricted index.
         if (method === 'restricted' && restrictIdx.length === 0) {
           finalMethod = 'unrestricted';
         }
-
-        // If they chose Hybrid Desired Gains but didn't check any restrict boxes
         if (method === 'desired_gains' && restrictIdx.length === 0) {
           throw new Error("Hybrid Desired Gains requires at least 1 restricted trait. Please check a 'Restrict' box to set a target.");
         }
 
-        const simPayload: Record<string, unknown> = {
+        const simPayload: SimulationInput = {
           method: finalMethod,
-          P: G, // Using G for P as requested by domain rules
+          P: G, 
           G: G,
           v: selectedTraits.map(t => economicWeights[t] || 0),
           cycles
@@ -195,60 +277,46 @@ export default function OpenIndexGenView() {
         }
         
         if (finalMethod === 'desired_gains' || finalMethod === 'pure_desired_gains') {
-          simPayload.delta = restrictIdx.map(idx => desiredGains[selectedTraits[idx]] || 0);
           if (finalMethod === 'pure_desired_gains') {
             simPayload.delta = selectedTraits.map(t => desiredGains[t] || 0);
+          } else {
+            simPayload.delta = restrictIdx.map(idx => desiredGains[selectedTraits[idx]] || 0);
           }
           simPayload.alpha_proportion = alpha;
         }
 
-        const simRes = await fetch(`${API_BASE}/simulate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(simPayload),
-          signal
-        });
-        const simData = await simRes.json();
-        if (!simRes.ok) throw new Error(simData.detail || simData.message);
+        const simData = OpenIndexGenEngine.simulate(simPayload);
+        if (simData.status === 'error') throw new Error(simData.message);
         
         setRedDot(simData.predicted_genetic_change as number[]);
         setOptimalB(simData.weights as number[]);
         
-      } catch (e: unknown) {
-        if (e instanceof DOMException && e.name === 'AbortError') return;
-        setError(e instanceof Error ? e.message : String(e));
+      } catch (e: any) {
+        setError(e.message || String(e));
       }
     };
     
-    // Use rapid timeout for smooth drag
-    const to = setTimeout(runSimulation, 30);
-    return () => clearTimeout(to);
-  }, [selectedTraits, method, economicWeights, desiredGains, restrictedTraits, alpha, cycles]);
+    // Smooth zero-latency updates!
+    runSimulation();
+  }, [fullData, selectedTraits, method, economicWeights, desiredGains, restrictedTraits, alpha, cycles]);
 
   // 3. Generate Ellipse Map for all pairs
   useEffect(() => {
     if (!GMatrix || selectedTraits.length < 2) return;
-    
-    fetch(`${API_BASE}/ellipse_module`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ G: GMatrix })
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.detail) throw new Error(data.detail);
+    try {
+      const data = OpenIndexGenEngine.generateGenupEllipse(GMatrix);
       if (selectedTraits.length === 2) {
-        // Special case: backend returned a single dict when N=2
         setEllipseDataMap({ "0_1": data });
       } else {
         setEllipseDataMap(data);
       }
-    })
-    .catch(e => setError(e.message));
+    } catch(e: any) {
+      setError(e.message);
+    }
   }, [GMatrix, selectedTraits]);
 
   // Handle clicking boundary (Reverse Engineer v)
-  const handleBoundaryClick = async (idxX: number, idxY: number, clickX: number, clickY: number) => {
+  const handleBoundaryClick = (idxX: number, idxY: number, clickX: number, clickY: number) => {
     if (!GMatrix) return;
     const G2x2 = [
       [GMatrix[idxX][idxX], GMatrix[idxX][idxY]],
@@ -256,13 +324,7 @@ export default function OpenIndexGenView() {
     ];
     
     try {
-      const revRes = await fetch(`${API_BASE}/ellipse_module`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ G: G2x2, target_x: clickX, target_y: clickY })
-      });
-      const revData = await revRes.json();
-      if (!revRes.ok) throw new Error(revData.detail);
+      const revData = OpenIndexGenEngine.reverseGenupEllipse(G2x2, clickX, clickY);
       if (!revData.v || !Array.isArray(revData.v)) return;
       
       const plotX = selectedTraits[idxX];
@@ -276,8 +338,8 @@ export default function OpenIndexGenView() {
         next[plotY] = revData.v[1] || 0;
         return next;
       });
-    } catch(e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch(e: any) {
+      setError(e.message || String(e));
     }
   };
 
@@ -289,9 +351,6 @@ export default function OpenIndexGenView() {
     setMethod('pure_desired_gains');
     setDesiredGains(prev => {
       const next = { ...prev };
-      // Optional: zero out other targets? 
-      // The user drag implies they only care about these two targets, but zeroing out forces the others to literally not change (0 gain).
-      // We will set others to 0 to keep it consistent with the "snap" behavior.
       selectedTraits.forEach(t => next[t] = 0);
       next[plotX] = newX;
       next[plotY] = newY;

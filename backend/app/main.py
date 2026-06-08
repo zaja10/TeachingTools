@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import spatial_strata, breeders_equation, lmm_visualizer, open_index_gen
+from app.api.v1.endpoints import spatial_strata, breeders_equation, lmm_visualizer
 
 app = FastAPI(
     title="Multi-Tool EdTech Hub",
@@ -21,7 +21,7 @@ app.add_middleware(
 app.include_router(spatial_strata.router, prefix="/api/v1/tools/spatial_strata", tags=["Spatial Strata"])
 app.include_router(breeders_equation.router, prefix="/api/v1/tools/breeders_equation", tags=["Breeder's Equation"])
 app.include_router(lmm_visualizer.router, prefix="/api/v1/tools/lmm_visualizer", tags=["LMM Visualizer"])
-app.include_router(open_index_gen.router, prefix="/api/v1/tools/open_index_gen", tags=["Open Index Gen"])
+
 # Commented out until these are implemented:
 # app.include_router(population_structure.router, prefix="/api/v1/tools/population_structure", tags=["Population Structure"])
 # app.include_router(genomic_selection.router, prefix="/api/v1/tools/genomic_selection", tags=["Genomic Selection"])

@@ -15,6 +15,7 @@
     "@xyflow/react": "^12.10.2",
     "dagre": "^0.8.5",
     "lucide-react": "^1.17.0",
+    "ml-matrix": "^6.12.2",
     "papaparse": "^5.5.3",
     "plotly.js": "^3.5.1",
     "react": "^19.2.6",
