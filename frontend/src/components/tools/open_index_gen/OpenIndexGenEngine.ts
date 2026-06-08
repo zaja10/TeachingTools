@@ -155,6 +155,15 @@ export class OpenIndexGenEngine {
             } else {
                 throw new Error(`Unknown method: ${method}`);
             }
+
+            // Standardize index variance to 1.0 for methods that only define direction (unrestricted, restricted)
+            if (method === 'unrestricted' || method === 'restricted') {
+                const var_I = b.transpose().mmul(P).mmul(b).get(0, 0);
+                if (var_I > 1e-12) {
+                    const sigma_I = Math.sqrt(var_I);
+                    b = b.mul(1.0 / sigma_I);
+                }
+            }
             
             // delta_G = b' * G => 1xN vector
             const delta_G = b.transpose().mmul(G);
