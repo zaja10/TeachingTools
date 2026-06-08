@@ -83,20 +83,23 @@ class OpenIndexGenEngine(TeachingEngine):
         
         # alpha_max = (delta' [G1' P^-1 G1]^-1 delta)^-1/2
         alpha_max_sq_inv = delta.T @ term1_inv @ delta
-        if alpha_max_sq_inv <= 0:
-            raise ValueError("Invalid target genetic changes delta, leading to negative or zero term.")
+        if alpha_max_sq_inv.item() <= 1e-12:
+            # Delta is 0. This is just a standard Restricted Index.
+            b_restricted = R @ G @ v
+            return b_restricted.reshape(-1, 1), 0.0
             
         alpha_max = 1.0 / np.sqrt(alpha_max_sq_inv.item())
         
         if alpha > alpha_max:
-            raise ValueError(f"Alpha parameter ({alpha}) exceeds maximum attainable desired gains ({alpha_max}).")
+            # Cap alpha at alpha_max instead of throwing an error for a smoother UI
+            alpha = alpha_max
             
         # First term scaling factor
         denom_sq = v.T @ G.T @ R @ G @ v
-        if denom_sq <= 0:
-            raise ValueError("Denominator for scaling factor must be positive.")
-        
-        scaling_factor = np.sqrt(1 - (alpha**2 / alpha_max**2)) / np.sqrt(denom_sq.item())
+        if denom_sq.item() <= 1e-12:
+            scaling_factor = 0.0
+        else:
+            scaling_factor = np.sqrt(1 - (alpha**2 / alpha_max**2)) / np.sqrt(denom_sq.item())
         
         # First term
         term_A = scaling_factor * (R @ G @ v)
