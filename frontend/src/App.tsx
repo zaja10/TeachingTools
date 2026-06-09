@@ -11,7 +11,9 @@ const componentMap: Record<string, React.LazyExoticComponent<any>> = {
   "lmm_visualizer/LmmVisualizerView": React.lazy(() => import('./components/tools/lmm_visualizer/LmmVisualizerView')),
   "hasse_designer/HasseDesignerView": React.lazy(() => import('./components/tools/hasse_designer/HasseDesignerView')),
   "net_merit_optimizer/NetMeritOptimizerView": React.lazy(() => import('./components/tools/net_merit_optimizer/NetMeritOptimizerView')),
-  "open_index_gen/OpenIndexGenView": React.lazy(() => import('./components/tools/open_index_gen/OpenIndexGenView'))
+  "open_index_gen/OpenIndexGenView": React.lazy(() => import('./components/tools/open_index_gen/OpenIndexGenView')),
+  "grmaker/GRMakerApp": React.lazy(() => import('./components/tools/grmaker/GRMakerApp')),
+  "plotmaker/PlotmakerApp": React.lazy(() => import('./components/tools/plotmaker/PlotmakerApp'))
 };
 
 const loadComponent = (componentPath: string) => {

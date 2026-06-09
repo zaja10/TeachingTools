@@ -1,4 +1,12 @@
-export const ToolRegistry = [
+export interface Tool {
+  id: string;
+  title: string;
+  category: string;
+  path: string;
+  component: string;
+}
+
+export const ToolRegistry: Tool[] = [
   {
     id: "breeders-equation",
     title: "Breeder's Equation Simulator",
@@ -33,5 +41,19 @@ export const ToolRegistry = [
     category: "Quantitative Genetics",
     path: "/tools/open-index-gen",
     component: "open_index_gen/OpenIndexGenView"
+  },
+  {
+    id: "grmaker",
+    title: "GRM Preparation (GRMaker)",
+    category: "Quantitative Genetics",
+    path: "/tools/grmaker",
+    component: "grmaker/GRMakerApp"
+  },
+  {
+    id: "plotmaker",
+    title: "Exploratory Data Analysis (Plotmaker)",
+    category: "Data Analysis",
+    path: "/tools/plotmaker",
+    component: "plotmaker/PlotmakerApp"
   }
 ];

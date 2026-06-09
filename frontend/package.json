@@ -12,12 +12,17 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@types/html2canvas": "^0.5.35",
     "@xyflow/react": "^12.10.2",
     "dagre": "^0.8.5",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "jstat": "^1.9.6",
     "lucide-react": "^1.17.0",
     "ml-matrix": "^6.12.2",
     "papaparse": "^5.5.3",
     "plotly.js": "^3.5.1",
+    "plotly.js-dist-min": "^3.6.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-plotly.js": "^2.6.0",
