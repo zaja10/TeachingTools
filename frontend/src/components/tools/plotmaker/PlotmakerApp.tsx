@@ -13,6 +13,8 @@ export default function PlotmakerApp() {
   const [data, setData] = useState<Record<string, any>[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pcaResult, setPcaResult] = useState<any>(null);
+  const [pcaCols, setPcaCols] = useState<string[]>([]);
   
   // Exclude .row_id from usable columns
   const usableCols = useMemo(() => columns.filter(c => c !== '.row_id'), [columns]);
@@ -78,7 +80,6 @@ export default function PlotmakerApp() {
   // PCA state
   const [pcaX, setPcaX] = useState('PC1');
   const [pcaY, setPcaY] = useState('PC2');
-  const [pcaResult, setPcaResult] = useState<any>(null);
 
   // Fallbacks
   React.useEffect(() => {
@@ -87,18 +88,22 @@ export default function PlotmakerApp() {
     if (!scatY && numericCols.length > 1) setScatY(numericCols[1]);
     if (!boxCat && categoricalCols.length > 0) setBoxCat(categoricalCols[0]);
     if (!boxNum && numericCols.length > 0) setBoxNum(numericCols[0]);
+    if (pcaCols.length === 0 && numericCols.length > 0) setPcaCols(numericCols);
   }, [numericCols, categoricalCols]);
 
+  const togglePcaCol = (col: string) => {
+    setPcaCols(prev => prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]);
+  };
+
   const runPCA = () => {
-    if (numericCols.length < 2) return alert("Need >= 2 numeric columns");
-    // build matrix
+    if (pcaCols.length < 2) return alert("Select at least 2 columns for PCA.");
     if (processedData.length === 0) return alert("No valid rows available after NA filtering.");
-    const matrixData = processedData.map(row => numericCols.map(col => row[col] as number));
+    const matrixData = processedData.map(row => pcaCols.map(col => row[col] as number));
     // Check for NAs
     if (matrixData.some(row => row.some(v => v == null || isNaN(v)))) {
-      return alert("NAs present in numeric columns. Please impute or omit NAs in preprocessing before PCA.");
+      return alert("NAs present in selected columns. Please impute or omit NAs in preprocessing before PCA.");
     }
-    const res = calculatePCA(matrixData, true, 5); // top 5
+    const res = calculatePCA(matrixData, true, 3); // top 5
     setPcaResult(res);
   };
 
@@ -322,20 +327,37 @@ export default function PlotmakerApp() {
 
             {activeTab === 'pca' && (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                  <button className="btn btn-primary" onClick={runPCA}>Run PCA Analysis</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>Select Columns for PCA:</label>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.5rem', maxHeight: '150px', overflowY: 'auto', padding: '1rem', background: 'rgba(0,0,0,0.1)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      {numericCols.map(c => (
+                        <label key={c} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                          <input type="checkbox" checked={pcaCols.includes(c)} onChange={() => togglePcaCol(c)} />
+                          {c}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button className="btn btn-primary" onClick={runPCA}>Run PCA Analysis</button>
+                    {pcaResult && (
+                      <button className="btn" onClick={() => setPcaResult(null)}>Clear PCA</button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                   {pcaResult && (
-                    <>
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                       <select className="input-field" value={pcaX} onChange={e => setPcaX(e.target.value)}>
                         {pcaResult.scores[0].map((_: any, i: number) => <option key={i} value={`PC${i+1}`}>PC{i+1}</option>)}
                       </select>
                       <select className="input-field" value={pcaY} onChange={e => setPcaY(e.target.value)}>
                         {pcaResult.scores[0].map((_: any, i: number) => <option key={i} value={`PC${i+1}`}>PC{i+1}</option>)}
                       </select>
-                    </>
+                    </div>
                   )}
-                </div>
-                <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, position: 'relative' }}>
                   {pcaResult && (() => {
                     const xIdx = parseInt(pcaX.replace('PC', '')) - 1;
                     const yIdx = parseInt(pcaY.replace('PC', '')) - 1;

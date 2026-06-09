@@ -73,6 +73,28 @@ export default function GRMakerApp() {
     setLoading(false);
   };
 
+  const loadExampleData = async () => {
+    setLoading(true);
+    try {
+      const snpRes = await fetch('./grm_example_snps.tsv');
+      const snpBlob = await snpRes.blob();
+      const snpFile = new File([snpBlob], 'grm_example_snps.tsv', { type: 'text/tab-separated-values' });
+      const snpParsed = await parseFile(snpFile, { sep: '\t' });
+      setSnpData(snpParsed.data);
+      setSnpCols(snpParsed.columns);
+
+      const phenoRes = await fetch('./grm_example_pheno.csv');
+      const phenoBlob = await phenoRes.blob();
+      const phenoFile = new File([phenoBlob], 'grm_example_pheno.csv', { type: 'text/csv' });
+      const phenoParsed = await parseFile(phenoFile);
+      setPhenoData(phenoParsed.data);
+      setPhenoCols(phenoParsed.columns);
+    } catch (err) {
+      alert("Failed to load example data. Ensure they are in the public folder.");
+    }
+    setLoading(false);
+  };
+
   // Removed unused snpIds
 
 
@@ -181,6 +203,10 @@ export default function GRMakerApp() {
           <Dna size={20} /> GRMaker
         </h2>
         
+        <button className="btn" onClick={loadExampleData} disabled={loading} style={{ background: 'var(--bg-tertiary)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          Load Example Dataset
+        </button>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>Upload SNP Matrix (Tab Separated)</label>
           <label className="btn" style={{ background: 'var(--color-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
