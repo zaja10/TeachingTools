@@ -1,35 +1,43 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 
 :root {
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
-  
-  --bg-base: #f1f5f9;
-  --bg-surface: rgba(255, 255, 255, 0.75);
-  --bg-surface-hover: rgba(255, 255, 255, 0.9);
+  /* Core Palette */
+  --bg-app: #f8fafc;         /* Light slate gray for app background */
+  --bg-base: #f8fafc;        /* Match existing code */
+  --bg-card: #ffffff;        /* Crisp white for tool surfaces */
+  --bg-surface: rgba(255, 255, 255, 0.85);
+  --bg-surface-hover: rgba(255, 255, 255, 0.95);
   --bg-surface-active: rgba(255, 255, 255, 1);
   
-  --border-light: rgba(0, 0, 0, 0.1);
-  --border-focus: rgba(139, 92, 246, 0.5);
+  --border-light: #e2e8f0;   /* Subtle divider lines */
+  --border-focus: rgba(19, 41, 75, 0.5);
   
-  --text-primary: #0f172a;
+  /* Typography & Brand */
+  --text-primary: #0f172a;   /* Deep slate for maximum text legibility */
   --text-secondary: #334155;
-  --text-muted: #64748b;
+  --text-muted: #64748b;     /* Muted gray for descriptions/tooltips */
   
-  --color-accent: #8b5cf6;
-  --color-accent-hover: #a78bfa;
-  --color-accent-glow: rgba(139, 92, 246, 0.2);
+  --color-primary: #13294b;  /* Deep Navy (UIUC style Core) */
+  --color-accent: #ff5f05;   /* Active Amber (UIUC style Accents/Red Dots) */
+  --color-accent-hover: #e04e00;
+  --color-accent-glow: rgba(255, 95, 5, 0.2);
+  --color-accent-rgb: 255, 95, 5;
   
-  --color-success: #10b981;
+  --color-success: #10b981;  /* Emerald for actions like "Load from Optimizer" */
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
   
+  --font-heading: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
   --radius-sm: 6px;
   --radius-md: 12px;
   --radius-lg: 16px;
   
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-glow: 0 0 20px var(--color-accent-glow);
   
   --transition-fast: 0.15s ease;
@@ -95,13 +103,13 @@ button {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-accent), #6366f1);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  box-shadow: 0 4px 14px 0 rgba(139, 92, 246, 0.39);
+  box-shadow: 0 4px 14px 0 rgba(255, 95, 5, 0.39);
 }
 
 .btn-primary:hover {
@@ -342,4 +350,52 @@ select:disabled {
 }
 .anova-table tr.selected td {
   background-color: var(--color-accent-glow);
+}
+
+/* --- Layout Utility Classes --- */
+
+/* Bottom Sticky Actions Tray */
+.bottom-actions-tray {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: var(--bg-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border-light);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 50;
+  box-shadow: 0 -4px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+/* Warning Badges */
+.badge-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Table Utilities */
+.table-sticky-header th {
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-surface);
+  z-index: 10;
+  border-bottom: 2px solid var(--border-light);
+  box-shadow: 0 2px 4px -2px rgba(0,0,0,0.05);
+}
+
+.table-row-active {
+  background-color: rgba(255, 95, 5, 0.08) !important;
 }

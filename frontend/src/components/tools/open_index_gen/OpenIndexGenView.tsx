@@ -96,6 +96,7 @@ export default function OpenIndexGenView() {
   // Visualization State
   const [showIsoeconomic, setShowIsoeconomic] = useState<boolean>(false);
   const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [activePair, setActivePair] = useState<[string, string] | null>(null);
 
   // Backend Results State
   const [GMatrix, setGMatrix] = useState<number[][] | null>(null);
@@ -263,39 +264,6 @@ export default function OpenIndexGenView() {
     });
   };
 
-  useEffect(() => {
-    if (selectedTraits.length === 0) return;
-
-    setDesiredGains(prev => {
-      const next = { ...prev };
-      let hasChanges = false;
-
-      selectedTraits.forEach(trait => {
-        // If the trait doesn't have a desired gain set yet, default it to 1
-        if (next[trait] === undefined || next[trait] === 0) {
-          next[trait] = 1; 
-          hasChanges = true;
-        }
-      });
-
-      return hasChanges ? next : prev;
-    });
-    
-    // Optionally, default economic weights to 0 so they don't cause NaN if the user switches back
-    setEconomicWeights(prev => {
-      const next = { ...prev };
-      let hasChanges = false;
-      selectedTraits.forEach(trait => {
-        if (next[trait] === undefined) {
-          next[trait] = 0;
-          hasChanges = true;
-        }
-      });
-      return hasChanges ? next : prev;
-    });
-
-  }, [selectedTraits]);
-
   // 2. Simulate when N-Trait state changes
   useEffect(() => {
     if (selectedTraits.length < 2) return;
@@ -344,7 +312,7 @@ export default function OpenIndexGenView() {
         }
 
         const simData = OpenIndexGenEngine.simulate(simPayload);
-        if (simData.status === 'error') throw new Error(simData.message);
+        if (simData.status === 'error') throw new Error(simData.message as string);
 
         setRedDot(simData.predicted_genetic_change as number[]);
         setOptimalB(simData.weights as number[]);
@@ -392,8 +360,8 @@ export default function OpenIndexGenView() {
       setMethod('unrestricted');
       setEconomicWeights(prev => {
         const next = { ...prev };
-        next[plotX] = revData.v[0] || 0;
-        next[plotY] = revData.v[1] || 0;
+        next[plotX] = (revData.v as number[])[0] || 0;
+        next[plotY] = (revData.v as number[])[1] || 0;
         return next;
       });
     } catch (e) {
@@ -425,7 +393,7 @@ export default function OpenIndexGenView() {
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
         const key = `${i}_${j}`;
-        const ellipse = ellipseDataMap[key];
+        const ellipse = (ellipseDataMap as Record<string, { x: number[], y: number[] }>)[key];
         if (!ellipse) continue;
 
         pairs.push(
@@ -440,6 +408,7 @@ export default function OpenIndexGenView() {
             showIsoeconomic={showIsoeconomic}
             onBoundaryClick={(x, y) => handleBoundaryClick(i, j, x, y)}
             onRedDotDrag={(x, y) => handleRedDotDrag(i, j, x, y)}
+            onHover={(hovered) => setActivePair(hovered ? [selectedTraits[i], selectedTraits[j]] : null)}
           />
         );
       }
@@ -458,56 +427,23 @@ export default function OpenIndexGenView() {
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <header style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem' }}>
-        <h1 style={{ margin: 0, fontSize: '2rem', color: 'var(--text-primary)' }}>N-Trait Index & Ellipse Matrix</h1>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Visualize all pairs of traits simultaneously!
-          <br /><strong>Drag the red dot</strong> to smoothly dial in your Desired Gains targets.
-          <br /><strong>Click "Snap to Limits"</strong> to auto-calculate the precise Unrestricted economic weights needed to push your selected direction to its theoretical maximum boundary!
-        </p>
-        <button onClick={() => setShowHelp(true)} style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '0.5rem 1rem', borderRadius: '100px', cursor: 'pointer', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.85rem' }}>
-          <HelpCircle size={16} /> How is the math calculated?
-        </button>
-      </header>
-
-      {/* Dataset Management Banner */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', padding: '1rem 1.5rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-primary)' }}>
-          <FileSpreadsheet size={20} color="var(--color-accent)" />
-          <span>Active Dataset: <strong style={{ fontFamily: 'monospace' }}>{datasetName}</strong></span>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <input
-            type="file"
-            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            style={{ display: 'none' }}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'var(--color-accent)', color: 'white', borderRadius: '4px', cursor: isUploading ? 'not-allowed' : 'pointer', border: 'none', fontSize: '0.85rem' }}
-          >
-            <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload Custom BLUPs'}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
+        <header style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem' }}>
+          <h1 style={{ margin: 0, fontSize: '2rem', color: 'var(--text-primary)' }}>N-Trait Index & Ellipse Matrix</h1>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Visualize all pairs of traits simultaneously!
+            <br /><strong>Drag the red dot</strong> to smoothly dial in your Desired Gains targets.
+            <br /><strong>Click "Snap to Limits"</strong> to auto-calculate the precise Unrestricted economic weights needed to push your selected direction to its theoretical maximum boundary!
+          </p>
+          <button onClick={() => setShowHelp(true)} style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '0.5rem 1rem', borderRadius: '100px', cursor: 'pointer', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.85rem' }}>
+            <HelpCircle size={16} /> How is the math calculated?
           </button>
-
-          {datasetName !== "Tested.parentSelectionFile07.09.2025.xlsx" && (
-            <button
-              onClick={handleResetDataset}
-              disabled={isUploading}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)', borderRadius: '4px', cursor: isUploading ? 'not-allowed' : 'pointer', border: '1px solid var(--border-light)', fontSize: '0.85rem' }}
-            >
-              <RefreshCw size={16} /> Reset to Example
-            </button>
-          )}
-        </div>
-      </div>
+        </header>
 
       {showHelp && (
         <div style={{ padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', position: 'relative' }}>
-          <button onClick={() => setShowHelp(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
+          <button title="Close help" aria-label="Close help" onClick={() => setShowHelp(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
           <h2 style={{ margin: '0 0 1rem 0', color: '#3b82f6', fontSize: '1.25rem' }}>Index Formula Breakdown</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
             <div>
@@ -581,6 +517,8 @@ export default function OpenIndexGenView() {
             <select
               value={method}
               onChange={e => setMethod(e.target.value as MethodType)}
+              title="Index Paradigm"
+              aria-label="Index Paradigm"
               style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', borderRadius: '4px', marginBottom: '1rem' }}
             >
               <option value="desired_gains">Hybrid Desired Gains</option>
@@ -589,23 +527,32 @@ export default function OpenIndexGenView() {
               <option value="restricted">Restricted Traits</option>
             </select>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-light)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '0.5rem' }}>Trait</th>
-                  {(method === 'restricted' || method === 'desired_gains') && <th style={{ padding: '0.5rem' }}>Restrict</th>}
-                  {method !== 'pure_desired_gains' && <th style={{ padding: '0.5rem' }}>$v$</th>}
-                  {(method === 'desired_gains' || method === 'pure_desired_gains') && <th style={{ padding: '0.5rem' }}>$\delta$</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {selectedTraits.map(t => (
-                  <tr key={t} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            {method === 'unrestricted' && selectedTraits.length > 0 && Object.values(economicWeights).every(v => v === 0 || !v) && (
+              <div className="badge-warning" style={{ marginBottom: '1rem', width: '100%' }}>
+                Please enter economic weights below to activate this paradigm.
+              </div>
+            )}
+
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead className="table-sticky-header">
+                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '0.5rem' }}>Trait</th>
+                    {(method === 'restricted' || method === 'desired_gains') && <th style={{ padding: '0.5rem' }}>Restrict</th>}
+                    {method !== 'pure_desired_gains' && <th style={{ padding: '0.5rem' }}>{method === 'desired_gains' ? 'Weight ($v$)' : 'Economic Weight ($v$)'}</th>}
+                    {(method === 'desired_gains' || method === 'pure_desired_gains') && <th style={{ padding: '0.5rem' }}>Target Response ($\Delta G$)</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedTraits.map(t => {
+                    const isActive = activePair?.includes(t);
+                    return (
+                      <tr key={t} className={isActive ? 'table-row-active' : ''} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', transition: 'background-color 0.2s' }}>
                     <td style={{ padding: '0.5rem', color: 'var(--text-primary)' }}>{t}</td>
 
                     {(method === 'restricted' || method === 'desired_gains') && (
                       <td style={{ padding: '0.5rem' }}>
-                        <input type="checkbox" checked={restrictedTraits[t]} onChange={e => setRestrictedTraits(r => ({ ...r, [t]: e.target.checked }))} />
+                        <input type="checkbox" title={`Restrict trait ${t}`} aria-label={`Restrict trait ${t}`} checked={restrictedTraits[t]} onChange={e => setRestrictedTraits(r => ({ ...r, [t]: e.target.checked }))} />
                       </td>
                     )}
 
@@ -613,6 +560,9 @@ export default function OpenIndexGenView() {
                       <td style={{ padding: '0.5rem' }}>
                         <input
                           type="number" step="0.1"
+                          title={`Economic Weight for ${t}`}
+                          aria-label={`Economic Weight for ${t}`}
+                          placeholder="0"
                           value={economicWeights[t]}
                           onChange={e => setEconomicWeights(w => ({ ...w, [t]: parseFloat(e.target.value) || 0 }))}
                           style={{ width: '60px', padding: '0.2rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', borderRadius: '4px' }}
@@ -624,6 +574,9 @@ export default function OpenIndexGenView() {
                       <td style={{ padding: '0.5rem' }}>
                         <input
                           type="number" step="0.1"
+                          title={`Target Response for ${t}`}
+                          aria-label={`Target Response for ${t}`}
+                          placeholder="0"
                           value={desiredGains[t]}
                           onChange={e => setDesiredGains(w => ({ ...w, [t]: parseFloat(e.target.value) || 0 }))}
                           style={{ width: '60px', padding: '0.2rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', borderRadius: '4px' }}
@@ -631,10 +584,12 @@ export default function OpenIndexGenView() {
                         />
                       </td>
                     )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
             {method === 'desired_gains' && (
               <div style={{ marginTop: '1rem' }}>
@@ -643,6 +598,8 @@ export default function OpenIndexGenView() {
                 </label>
                 <input
                   type="range" min="0" max="1" step="0.01"
+                  title="Proportional Allocation"
+                  aria-label="Proportional Allocation"
                   value={alpha} onChange={e => setAlpha(parseFloat(e.target.value))}
                   style={{ width: '100%' }}
                 />
@@ -685,6 +642,45 @@ export default function OpenIndexGenView() {
 
         </div>
       </div>
+
+      {/* Bottom Global Actions Tray */}
+      <div className="bottom-actions-tray">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-primary)' }}>
+          <FileSpreadsheet size={20} color="var(--color-accent)" />
+          <span>Active Dataset: <strong style={{ fontFamily: 'monospace' }}>{datasetName}</strong></span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <input
+            type="file"
+            title="Upload Custom BLUPs dataset"
+            aria-label="Upload Custom BLUPs dataset"
+            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
+          >
+            <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload Custom BLUPs'}
+          </button>
+
+          {datasetName !== "Tested.parentSelectionFile07.09.2025.xlsx" && (
+            <button
+              onClick={handleResetDataset}
+              disabled={isUploading}
+              className="btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(0,0,0,0.05)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
+            >
+              <RefreshCw size={16} /> Reset to Example
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
     </div>
   );
 }

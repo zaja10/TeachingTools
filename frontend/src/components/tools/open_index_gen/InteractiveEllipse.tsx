@@ -10,6 +10,7 @@ interface InteractiveEllipseProps {
   showIsoeconomic: boolean;
   onBoundaryClick: (x: number, y: number) => void;
   onRedDotDrag: (x: number, y: number) => void;
+  onHover?: (hovered: boolean) => void;
 }
 
 export function InteractiveEllipse({
@@ -21,7 +22,8 @@ export function InteractiveEllipse({
   vY,
   showIsoeconomic,
   onBoundaryClick,
-  onRedDotDrag
+  onRedDotDrag,
+  onHover
 }: InteractiveEllipseProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -124,7 +126,11 @@ export function InteractiveEllipse({
   const { px: originPx, py: originPy } = mapToSvg(0, 0, 100, 100);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
+    <div 
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}
+      onMouseEnter={() => onHover && onHover(true)}
+      onMouseLeave={() => onHover && onHover(false)}
+    >
       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
         {traitY} vs {traitX}
       </div>

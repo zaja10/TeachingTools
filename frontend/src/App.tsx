@@ -86,31 +86,35 @@ function AppShell() {
           </NavLink>
 
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto', overflowX: 'hidden', width: '100%' }}>
-            <div style={{ 
-              fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', 
-              marginBottom: '0.5rem', textAlign: isSidebarOpen ? 'left' : 'center',
-              opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.3s'
-            }}>
-              {isSidebarOpen ? 'Simulators & Models' : '•'}
-            </div>
-            {ToolRegistry.map((tool) => (
-              <NavLink 
-                key={tool.id} 
-                to={tool.path}
-                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                title={tool.title}
-                style={{ justifyContent: isSidebarOpen ? 'flex-start' : 'center', padding: isSidebarOpen ? '0.75rem 1rem' : '0.75rem 0' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px' }}>
-                  {getIcon(tool.id)}
-                </div>
-                <span style={{ 
-                  fontWeight: 500, fontSize: '0.9rem', whiteSpace: 'nowrap',
-                  opacity: isSidebarOpen ? 1 : 0, width: isSidebarOpen ? 'auto' : 0, overflow: 'hidden', transition: 'opacity 0.3s'
+            {Array.from(new Set(ToolRegistry.map(t => t.category))).map(category => (
+              <div key={category} style={{ marginBottom: '1rem' }}>
+                <div style={{ 
+                  fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', 
+                  marginBottom: '0.5rem', textAlign: isSidebarOpen ? 'left' : 'center',
+                  opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.3s'
                 }}>
-                  {tool.title}
-                </span>
-              </NavLink>
+                  {isSidebarOpen ? category : '•'}
+                </div>
+                {ToolRegistry.filter(t => t.category === category).map((tool) => (
+                  <NavLink 
+                    key={tool.id} 
+                    to={tool.path}
+                    className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                    title={tool.title}
+                    style={{ justifyContent: isSidebarOpen ? 'flex-start' : 'center', padding: isSidebarOpen ? '0.75rem 1rem' : '0.75rem 0' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px' }}>
+                      {getIcon(tool.id)}
+                    </div>
+                    <span style={{ 
+                      fontWeight: 500, fontSize: '0.9rem', whiteSpace: 'nowrap',
+                      opacity: isSidebarOpen ? 1 : 0, width: isSidebarOpen ? 'auto' : 0, overflow: 'hidden', transition: 'opacity 0.3s'
+                    }}>
+                      {tool.title}
+                    </span>
+                  </NavLink>
+                ))}
+              </div>
             ))}
           </nav>
         </aside>
