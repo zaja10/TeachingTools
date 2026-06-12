@@ -14,6 +14,7 @@ const componentMap: Record<string, React.LazyExoticComponent<any>> = {
   "hasse_designer/HasseDesignerView": React.lazy(() => import('./components/tools/hasse_designer/HasseDesignerView')),
   "net_merit_optimizer/NetMeritOptimizerView": React.lazy(() => import('./components/tools/net_merit_optimizer/NetMeritOptimizerView')),
   "open_index_gen/OpenIndexGenView": React.lazy(() => import('./components/tools/open_index_gen/OpenIndexGenView')),
+  "cross_performance/CrossPerformanceView": React.lazy(() => import('./components/tools/cross_performance/CrossPerformanceView')),
   "grmaker/GRMakerApp": React.lazy(() => import('./components/tools/grmaker/GRMakerApp')),
   "plotmaker/PlotmakerApp": React.lazy(() => import('./components/tools/plotmaker/PlotmakerApp'))
 };
@@ -36,31 +37,34 @@ const getIcon = (id: string) => {
   return <BookOpen size={18} />;
 };
 
+import { IndexProvider } from './context/IndexContext';
+
 function AppShell() {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   return (
-    <Router>
-      <div className="app-style-2">
-        
-        {/* Sidebar Navigation */}
-        <aside 
-          onMouseEnter={() => setIsSidebarOpen(true)}
-          onMouseLeave={() => setIsSidebarOpen(false)}
-          style={{ 
-            width: isSidebarOpen ? '280px' : '80px', 
-            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            borderRight: '1px solid var(--border-light)', 
-            padding: '2rem 1rem', 
-            display: 'flex', 
-            flexDirection: 'column',
-            alignItems: isSidebarOpen ? 'stretch' : 'center',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
-            zIndex: 10,
-            overflowX: 'hidden'
-          }}
-        >
-          <NavLink to="/" className="app-style-3">
+    <IndexProvider>
+      <Router>
+        <div className="app-style-2">
+          
+          {/* Sidebar Navigation */}
+          <aside 
+            onMouseEnter={() => setIsSidebarOpen(true)}
+            onMouseLeave={() => setIsSidebarOpen(false)}
+            style={{ 
+              width: isSidebarOpen ? '280px' : '80px', 
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              borderRight: '1px solid var(--border-light)', 
+              padding: '2rem 1rem', 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: isSidebarOpen ? 'stretch' : 'center',
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)',
+              zIndex: 10,
+              overflowX: 'hidden'
+            }}
+          >
+            <NavLink to="/" className="app-style-3">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem', width: '100%', justifyContent: isSidebarOpen ? 'flex-start' : 'center' }}>
               <div style={{ 
                 background: 'linear-gradient(135deg, var(--color-accent), #6366f1)',
@@ -159,6 +163,7 @@ function AppShell() {
         </main>
       </div>
     </Router>
+    </IndexProvider>
   );
 }
 

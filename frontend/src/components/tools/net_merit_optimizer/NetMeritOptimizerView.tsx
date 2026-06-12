@@ -3,6 +3,8 @@ import PlotLib from 'react-plotly.js';
 const Plot = (PlotLib as unknown as { default: typeof PlotLib }).default || PlotLib;
 import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
 import { parseFile, extractNumericTraits, findGenotypeColumn, type DataRow } from './utils';
+import { useIndexContext } from '../../../context/IndexContext';
+import { useNavigate } from 'react-router-dom';
 
 const NetMeritOptimizerView: React.FC = () => {
   const [data, setData] = useState<DataRow[]>([]);
@@ -21,8 +23,12 @@ const NetMeritOptimizerView: React.FC = () => {
   const [isTraitSelectionOpen, setIsTraitSelectionOpen] = useState<boolean>(true);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState<boolean>(false);
   const [plotMode, setPlotMode] = useState<'deltaG' | 'netMerit'>('deltaG');
+  const [datasetName, setDatasetName] = useState<string>('Tested.parentSelectionFile07.09.2025.xlsx');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const { setActiveExport } = useIndexContext();
+  const navigate = useNavigate();
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,6 +45,7 @@ const NetMeritOptimizerView: React.FC = () => {
       
       setData(parsedData);
       setTraits(numericTraits);
+      setDatasetName(file.name);
       
       // Reset selections
       setSelectedTraits(new Set());
@@ -261,6 +268,34 @@ const NetMeritOptimizerView: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const handleExportToIndex = () => {
+    if (selectedTraits.size === 0) return;
+    
+    // Convert weights to array in order of selectedTraits
+    const traitsArray = Array.from(selectedTraits);
+    const optimalB = traitsArray.map(t => weights[t] || 0);
+    
+    // Create fullData format
+    const fullData: Record<string, number[]> = {};
+    traitsArray.forEach(t => {
+      fullData[t] = data.map(row => (row as DataRow)[t] as number);
+    });
+    
+    // Extract line names
+    const genoCol = findGenotypeColumn(Object.keys(data[0] || {}));
+    const lineNames = data.map((row, i) => genoCol ? String((row as DataRow)[genoCol]) : `Line_${i+1}`);
+    
+    setActiveExport({
+      fullData,
+      lineNames,
+      selectedTraits: traitsArray,
+      optimalB,
+      sourceTool: 'Net Merit Index Optimizer',
+      datasetName
+    });
+    navigate('/tools/cross-performance');
+  };
+
   return (
     <>
     <ToolLayoutWrapper 
@@ -268,7 +303,7 @@ const NetMeritOptimizerView: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <h1 style={{ margin: 0, fontSize: '1.5rem', color: 'var(--color-accent)' }}>Interactive Net Merit Index Optimizer</h1>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--color-accent)' }}>Interactive Net Merit Index Optimizer</h1>
               <button 
                 onClick={() => setIsInfoModalOpen(true)}
                 style={{ 
@@ -288,7 +323,7 @@ const NetMeritOptimizerView: React.FC = () => {
                 title="View Formulas"
               >?</button>
             </div>
-            <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)' }}>Dynamically select traits and optimize genetic gain through customizable index weights.</p>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Dynamically select traits and optimize genetic gain through customizable index weights.</p>
           </div>
         </div>
       }
@@ -586,10 +621,23 @@ const NetMeritOptimizerView: React.FC = () => {
         </div>
       }
       metrics={
-        <div style={{ display: 'flex', justifyContent: 'space-around', color: 'var(--text-secondary)', width: '100%' }}>
-          <span>Total Population: <strong style={{ color: '#4ade80' }}>{data.length}</strong></span>
-          <span>Selected Lines: <strong style={{ color: '#fbbf24' }}>{results.topLines.length}</strong></span>
-          <span title="Variance relative to an equal-weights baseline">Relative Efficiency (RE²): <strong style={{ color: '#60a5fa' }}>{relativeEfficiency}</strong></span>
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', color: 'var(--text-secondary)', width: '100%' }}>
+            <span>Total Population: <strong style={{ color: '#4ade80' }}>{data.length}</strong></span>
+            <span>Selected Lines: <strong style={{ color: '#fbbf24' }}>{results.topLines.length}</strong></span>
+            <span title="Variance relative to an equal-weights baseline">Relative Efficiency (RE²): <strong style={{ color: '#60a5fa' }}>{relativeEfficiency}</strong></span>
+          </div>
+          {selectedTraits.size > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+               <button 
+                 onClick={handleExportToIndex} 
+                 className="btn-primary" 
+                 style={{ width: '50%', padding: '0.75rem' }}
+               >
+                 Export Index to Cross Performance Rankings
+               </button>
+            </div>
+          )}
         </div>
       }
     />

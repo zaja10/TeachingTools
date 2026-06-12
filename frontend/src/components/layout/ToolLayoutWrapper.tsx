@@ -13,7 +13,7 @@ const ToolLayoutWrapper: React.FC<ToolLayoutProps> = ({ header, controls, canvas
       <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       
       {/* Tool Header */}
-      <header className="glass-panel" style={{ padding: '1.5rem 2rem', borderLeft: '4px solid var(--color-accent)' }}>
+      <header className="glass-panel" style={{ padding: '0.75rem 1.5rem', borderLeft: '4px solid var(--color-accent)' }}>
         {header}
       </header>
 

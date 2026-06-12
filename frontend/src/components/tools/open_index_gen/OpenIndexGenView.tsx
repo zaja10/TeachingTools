@@ -5,9 +5,9 @@ import { InteractiveEllipse } from './InteractiveEllipse';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { OpenIndexGenEngine, type MethodType, type SimulationInput } from './OpenIndexGenEngine';
-import type { PredictedCross } from '../../../engine/crossSelector/crossEngine';
-import { CrossSelectorTable } from './CrossSelectorTable';
 import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
+import { useIndexContext } from '../../../context/IndexContext';
+import { useNavigate } from 'react-router-dom';
 import './OpenIndexGenView.css';
 
 function calculateCovarianceForTraits(data: Record<string, number[]>, traits: string[]): number[][] {
@@ -104,16 +104,14 @@ export default function OpenIndexGenView() {
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [activePair, setActivePair] = useState<[string, string] | null>(null);
 
-  // Web Worker state
-  const [crossRankings, setCrossRankings] = useState<PredictedCross[]>([]);
-  const [isCalculatingCrosses, setIsCalculatingCrosses] = useState(false);
-  const workerRef = useRef<Worker | null>(null);
-
   // Hardcoded default fallback file
   const [GMatrix, setGMatrix] = useState<number[][] | null>(null);
   const [redDot, setRedDot] = useState<number[] | null>(null);
   const [optimalB, setOptimalB] = useState<number[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const { setActiveExport } = useIndexContext();
+  const navigate = useNavigate();
 
   const processParsedData = useCallback((data: Record<string, unknown>[], filename: string) => {
     if (data.length === 0) throw new Error("Dataset is empty");
@@ -234,20 +232,8 @@ export default function OpenIndexGenView() {
     };
     init();
 
-    // Initialize Worker
-    workerRef.current = new Worker(new URL('../../../engine/crossSelector/crossWorker.ts', import.meta.url), { type: 'module' });
-    workerRef.current.onmessage = (e) => {
-      if (e.data.success) {
-        setCrossRankings(e.data.crosses);
-      } else {
-        console.error("Worker error:", e.data.error);
-      }
-      setIsCalculatingCrosses(false);
-    };
-
     return () => { 
       mounted = false; 
-      workerRef.current?.terminate();
     };
   }, [loadDefaultDataset]);
 
@@ -404,26 +390,22 @@ export default function OpenIndexGenView() {
     }
   };
 
-  useEffect(() => {
-    if (!optimalB || selectedTraits.length < 2) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCrossRankings([]);
-      return;
-    }
-    
-    setIsCalculatingCrosses(true);
-    // Fallback if lineNames is somehow empty
+  const handleExportToIndex = () => {
+    if (!optimalB || selectedTraits.length < 2) return;
     const names = lineNames.length > 0 
       ? lineNames 
       : Array.from({length: fullData[selectedTraits[0]]?.length || 0}, (_, i) => `Line_${i+1}`);
       
-    workerRef.current?.postMessage({
+    setActiveExport({
       fullData,
+      lineNames: names,
       selectedTraits,
       optimalB,
-      lineNames: names
+      sourceTool: 'Selection Index Generator',
+      datasetName
     });
-  }, [fullData, selectedTraits, optimalB, lineNames]);
+    navigate('/tools/cross-performance');
+  };
 
   // Handle dragging red dot (Pure Desired Gains)
   const handleRedDotDrag = (idxX: number, idxY: number, newX: number, newY: number) => {
@@ -486,11 +468,9 @@ export default function OpenIndexGenView() {
     <ToolLayoutWrapper
       header={
         <div>
-          <h1 className="oig-style-5">N-Trait Index & Ellipse Matrix</h1>
-          <p className="oig-style-6">
-            Visualize all pairs of traits simultaneously!
-            <br /><strong>Drag the red dot</strong> to smoothly dial in your Desired Gains targets.
-            <br /><strong>Click "Snap to Limits"</strong> to auto-calculate the precise Unrestricted economic weights needed to push your selected direction to its theoretical maximum boundary!
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>N-Trait Index & Ellipse Matrix</h1>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+            Visualize all pairs of traits simultaneously! <strong>Drag the red dot</strong> or click <strong>"Snap to Limits"</strong>.
           </p>
           <button onClick={() => setShowHelp(true)} style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '0.5rem 1rem', borderRadius: '100px', cursor: 'pointer', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.85rem' }}>
             <HelpCircle size={16} /> How is the math calculated?
@@ -698,19 +678,16 @@ export default function OpenIndexGenView() {
       }
       metrics={
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {isCalculatingCrosses && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-accent)' }}>
-              <RefreshCw className="spin" size={16} /> Calculating cross rankings...
-            </div>
-          )}
-          {crossRankings.length > 0 && !isCalculatingCrosses && (
-            <div className="oig-style-45">
-              <CrossSelectorTable 
-                crosses={crossRankings} 
-                selectedTraits={selectedTraits} 
-              />
-            </div>
-          )}
+          <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }}>
+            <button 
+              onClick={handleExportToIndex} 
+              disabled={!optimalB || selectedTraits.length < 2}
+              className="btn-primary" 
+              style={{ width: '100%', padding: '0.75rem' }}
+            >
+              Export Index to Cross Performance Rankings
+            </button>
+          </div>
           
           <div className="bottom-actions-tray">
             <div className="oig-style-46">

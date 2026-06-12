@@ -43,6 +43,13 @@ export const ToolRegistry: Tool[] = [
     component: "open_index_gen/OpenIndexGenView"
   },
   {
+    id: "cross-performance",
+    title: "Predicted Cross Performance",
+    category: "Selection Index Design",
+    path: "/tools/cross-performance",
+    component: "cross_performance/CrossPerformanceView"
+  },
+  {
     id: "grmaker",
     title: "GRM Preparation (GRMaker)",
     category: "Trial Analysis",
