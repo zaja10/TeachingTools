@@ -1,0 +1,30 @@
+.ie-style-1 {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.ie-style-2 {
+  width: 100%;
+  aspect-ratio: 1/1;
+  position: relative;
+}
+
+.ie-style-3 {
+  cursor: grab;
+  pointer-events: none;
+}
+
+.ie-style-4 {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ie-style-5 {
+  margin-left: 0.5rem;
+}

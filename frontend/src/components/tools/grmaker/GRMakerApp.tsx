@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Upload, Download, Dna, RefreshCw } from 'lucide-react';
+import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
 import { parseFile } from '../../../utils/dataParser';
 import { calculatePCA } from '../../../utils/mathUtils';
 import PlotViewer from '../plotmaker/PlotViewer';
@@ -26,7 +27,7 @@ export default function GRMakerApp() {
   const [grmResult, setGrmResult] = useState<{grm: number[][], grmInv: number[][]} | null>(null);
 
   // PCA State
-  const [pcaResult, setPcaResult] = useState<Record<string, unknown> | null>(null);
+  const [pcaResult, setPcaResult] = useState<{ scores: number[][], varianceExplained: number[] } | null>(null);
 
   // Worker Ref
   const workerRef = useRef<Worker | null>(null);
@@ -97,9 +98,6 @@ export default function GRMakerApp() {
     }
     setLoading(false);
   };
-
-  // Removed unused snpIds
-
 
   const markerCols = useMemo(() => snpCols.slice(1).filter(c => c !== '.row_id'), [snpCols]);
 
@@ -199,48 +197,51 @@ export default function GRMakerApp() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: '1rem' }}>
-      {/* SIDEBAR */}
-      <div className="glass-panel" style={{ width: '350px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto' }}>
-        <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Dna size={20} /> GRMaker
-        </h2>
-        
-        <button className="btn" onClick={loadExampleData} disabled={loading} style={{ background: 'var(--bg-tertiary)', border: '1px solid rgba(255,255,255,0.1)' }}>
-          Load Example Dataset
-        </button>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>Upload SNP Matrix (Tab Separated)</label>
-          <label className="btn" style={{ background: 'var(--color-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
-            <Upload size={18} style={{ marginRight: '0.5rem' }} />
-            Choose SNP File
-            <input type="file" accept=".txt,.tsv,.dat" style={{ display: 'none' }} onChange={handleSnpUpload} />
-          </label>
+    <ToolLayoutWrapper
+      header={
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Dna size={24} /> Genomic Relationship Matrix (GRMaker)
+          </h1>
+          <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)' }}>Build and diagnose GRMs, visualize population structure with PCA, and prepare phenotype data.</p>
         </div>
+      }
+      controls={
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <button className="btn btn-secondary" onClick={loadExampleData} disabled={loading}>
+            Load Example Dataset
+          </button>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>Upload Phenotype Data (CSV)</label>
-          <label className="btn" style={{ background: 'var(--color-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
-            <Upload size={18} style={{ marginRight: '0.5rem' }} />
-            Choose Pheno File
-            <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handlePhenoUpload} />
-          </label>
-          {phenoData.length > 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loaded {phenoData.length} records with {phenoCols.length} columns.</span>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Upload SNP Matrix (Tab Separated)</label>
+            <label className="btn" style={{ background: 'var(--color-primary)', color: 'white', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
+              <Upload size={18} style={{ marginRight: '0.5rem' }} />
+              Choose SNP File
+              <input type="file" accept=".txt,.tsv,.dat" style={{ display: 'none' }} onChange={handleSnpUpload} />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Upload Phenotype Data (CSV)</label>
+            <label className="btn" style={{ background: 'var(--color-primary)', color: 'white', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
+              <Upload size={18} style={{ marginRight: '0.5rem' }} />
+              Choose Pheno File
+              <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handlePhenoUpload} />
+            </label>
+            {phenoData.length > 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loaded {phenoData.length} records.</span>}
+          </div>
+
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+            <button className={`btn ${activeTab === 'qc' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('qc')} style={{ justifyContent: 'flex-start' }}>1. Input & QC</button>
+            <button className={`btn ${activeTab === 'grm' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('grm')} style={{ justifyContent: 'flex-start' }}>2. GRM & Diagnostics</button>
+            <button className={`btn ${activeTab === 'pca' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('pca')} style={{ justifyContent: 'flex-start' }}>3. Population Structure (PCA)</button>
+            <button className={`btn ${activeTab === 'match' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('match')} style={{ justifyContent: 'flex-start' }}>4. Match & Download</button>
+          </nav>
         </div>
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-          <button className={`btn ${activeTab === 'qc' ? 'active' : ''}`} onClick={() => setActiveTab('qc')} style={{ justifyContent: 'flex-start' }}>1. Input & QC</button>
-          <button className={`btn ${activeTab === 'grm' ? 'active' : ''}`} onClick={() => setActiveTab('grm')} style={{ justifyContent: 'flex-start' }}>2. GRM & Diagnostics</button>
-          <button className={`btn ${activeTab === 'pca' ? 'active' : ''}`} onClick={() => setActiveTab('pca')} style={{ justifyContent: 'flex-start' }}>3. Population Structure (PCA)</button>
-          <button className={`btn ${activeTab === 'match' ? 'active' : ''}`} onClick={() => setActiveTab('match')} style={{ justifyContent: 'flex-start' }}>4. Match & Download</button>
-        </nav>
-      </div>
-
-      {/* MAIN CONTENT */}
-      <div className="glass-panel" style={{ flex: 1, padding: '2rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        
-        {loading && <div style={{ marginBottom: '1rem', color: '#8b5cf6' }}><RefreshCw className="spin" size={16} /> Loading data...</div>}
+      }
+      canvas={
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+          {loading && <div style={{ marginBottom: '1rem', color: 'var(--color-accent)' }}><RefreshCw className="spin" size={16} /> Loading data...</div>}
 
         {activeTab === 'qc' && (
           <div>
@@ -336,8 +337,20 @@ export default function GRMakerApp() {
             )}
           </div>
         )}
-
-      </div>
-    </div>
+        </div>
+      }
+      metrics={
+        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          <div>
+            <strong>SNP Status: </strong> 
+            {filteredMatrix ? `${filteredMatrix.matrix.length} Individuals, ${filteredMatrix.matrix[0]?.length || 0} Markers` : 'None'}
+          </div>
+          <div>
+            <strong>GRM Status: </strong>
+            {grmResult ? 'Computed' : 'Pending'}
+          </div>
+        </div>
+      }
+    />
   );
 }

@@ -1,3 +1,4 @@
+import './App.css';
 import React, { Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { BookOpen, Activity, Dna, LayoutDashboard, Database } from 'lucide-react';
@@ -20,7 +21,7 @@ const componentMap: Record<string, React.LazyExoticComponent<any>> = {
 const loadComponent = (componentPath: string) => {
   const Component = componentMap[componentPath];
   if (!Component) {
-    return () => <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>Component {componentPath} Not Found</div>;
+    return () => <div className="glass-panel app-style-1">Component {componentPath} Not Found</div>;
   }
   return Component;
 };
@@ -40,7 +41,7 @@ function AppShell() {
 
   return (
     <Router>
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <div className="app-style-2">
         
         {/* Sidebar Navigation */}
         <aside 
@@ -59,7 +60,7 @@ function AppShell() {
             overflowX: 'hidden'
           }}
         >
-          <NavLink to="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', justifyContent: 'center' }}>
+          <NavLink to="/" className="app-style-3">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem', width: '100%', justifyContent: isSidebarOpen ? 'flex-start' : 'center' }}>
               <div style={{ 
                 background: 'linear-gradient(135deg, var(--color-accent), #6366f1)',
@@ -79,15 +80,15 @@ function AppShell() {
                 overflow: 'hidden', 
                 transition: 'opacity 0.3s' 
               }}>
-                <h1 style={{ fontSize: '1.25rem', margin: 0, letterSpacing: '-0.02em', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>QGen Hub</h1>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, whiteSpace: 'nowrap' }}>Quantitative Genetics</p>
+                <h1 className="app-style-4">QGen Hub</h1>
+                <p className="app-style-5">Quantitative Genetics</p>
               </div>
             </div>
           </NavLink>
 
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto', overflowX: 'hidden', width: '100%' }}>
+          <nav className="app-style-6">
             {Array.from(new Set(ToolRegistry.map(t => t.category))).map(category => (
-              <div key={category} style={{ marginBottom: '1rem' }}>
+              <div key={category} className="app-style-7">
                 <div style={{ 
                   fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', 
                   marginBottom: '0.5rem', textAlign: isSidebarOpen ? 'left' : 'center',
@@ -103,7 +104,7 @@ function AppShell() {
                     title={tool.title}
                     style={{ justifyContent: isSidebarOpen ? 'flex-start' : 'center', padding: isSidebarOpen ? '0.75rem 1rem' : '0.75rem 0' }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px' }}>
+                    <div className="app-style-8">
                       {getIcon(tool.id)}
                     </div>
                     <span style={{ 
@@ -120,23 +121,23 @@ function AppShell() {
         </aside>
 
         {/* Main Content Area */}
-        <main style={{ flex: 1, overflow: 'auto', padding: '2rem 3rem', position: 'relative' }}>
+        <main className="app-style-9">
           {/* subtle background glow */}
           <div style={{ position: 'absolute', top: '-10%', left: '50%', width: '50vw', height: '50vw', background: 'radial-gradient(circle, var(--color-accent-glow) 0%, transparent 70%)', transform: 'translateX(-50%)', opacity: 0.5, pointerEvents: 'none', zIndex: 0 }}></div>
           
-          <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>
+          <div className="app-style-10">
             <Suspense fallback={
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-                <div style={{ width: '40px', height: '40px', border: '3px solid var(--border-light)', borderTopColor: 'var(--color-accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+              <div className="app-style-11">
+                <div className="app-style-12"></div>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                <div style={{ marginTop: '1rem', fontWeight: 500 }}>Loading simulator...</div>
+                <div className="app-style-13">Loading simulator...</div>
               </div>
             }>
               <Routes>
                 <Route path="/" element={
-                  <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center', maxWidth: '600px', margin: '4rem auto' }}>
+                  <div className="glass-panel app-style-14">
                     <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', background: 'linear-gradient(to right, #fff, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Welcome to the Lab</h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', marginBottom: '2rem' }}>
+                    <p className="app-style-15">
                       Select a simulator from the sidebar to begin running experiments and visualizing quantitative genetics concepts in real-time.
                     </p>
                   </div>

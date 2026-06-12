@@ -113,7 +113,7 @@ const NetMeritOptimizerView: React.FC = () => {
       let score = 0;
       let equalWeightScore = 0;
       traitsArray.forEach(t => {
-        let val = row[t];
+        let val = row[t] as number | undefined;
         // If missing, impute with mean (which makes stdVal = 0, contributing 0 to the sum)
         if (typeof val !== 'number') {
           val = popMeans[t];
@@ -565,7 +565,7 @@ const NetMeritOptimizerView: React.FC = () => {
                       const displayId = genoCol ? (row as DataRow)[genoCol] : row._originalIndex;
                       return (
                       <tr key={i}>
-                        <td>{displayId}</td>
+                        <td>{String(displayId)}</td>
                         <td style={{ fontWeight: 'bold' }}>{row._netMeritScore.toFixed(2)}</td>
                         {Array.from(selectedTraits).map(t => <td key={t}>{Number((row as DataRow)[t] || 0).toFixed(2)}</td>)}
                       </tr>

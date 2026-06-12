@@ -5,6 +5,7 @@ import { applyTransform, calculatePCA } from '../../../utils/mathUtils';
 import { calculateSummaryStats, fitLinearModel, performAnova, performTTest } from '../../../utils/statsUtils';
 import PlotViewer from './PlotViewer';
 import { exportElementToPDF } from './PdfReportGenerator';
+import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
 
 type TabType = 'preprocessing' | 'summary' | 'histogram' | 'scatter' | 'boxplot' | 'correlation' | 'pca';
 
@@ -38,7 +39,7 @@ export default function PlotmakerApp() {
       return data.map(row => {
         const newRow = { ...row };
         numericCols.forEach(col => {
-          if (newRow[col] == null || isNaN(newRow[col])) newRow[col] = means[col];
+          if (newRow[col] == null || isNaN(newRow[col] as number)) newRow[col] = means[col];
         });
         return newRow;
       });
@@ -111,48 +112,52 @@ export default function PlotmakerApp() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: '1rem' }}>
-      {/* SIDEBAR */}
-      <div className="glass-panel" style={{ width: '300px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto' }}>
-        <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <FileBarChart size={20} /> Plotmaker
-        </h2>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>Upload Data (CSV/XLSX)</label>
-          <label className="btn" style={{ background: 'var(--color-primary)', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
-            {loading ? <RefreshCw className="spin" size={18} /> : <Upload size={18} style={{ marginRight: '0.5rem' }} />}
-            {loading ? 'Processing...' : 'Choose File'}
-            <input type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={handleFileUpload} />
-          </label>
+    <ToolLayoutWrapper
+      header={
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileBarChart size={24} /> Exploratory Data Analysis (Plotmaker)
+          </h1>
+          <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)' }}>Visualize distributions, relationships, and multivariate structure through PCA.</p>
         </div>
-
-        {data.length > 0 && (
+      }
+      controls={
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>NA Handling</label>
-            <select className="input-field" value={naAction} onChange={e => setNaAction(e.target.value)}>
-              <option value="none">Keep NAs</option>
-              <option value="na.omit">Remove rows with NA</option>
-              <option value="mean_impute">Mean Impute (Numeric)</option>
-            </select>
+            <label style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Upload Data (CSV/XLSX)</label>
+            <label className="btn" style={{ background: 'var(--color-primary)', color: 'white', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
+              {loading ? <RefreshCw className="spin" size={18} /> : <Upload size={18} style={{ marginRight: '0.5rem' }} />}
+              {loading ? 'Processing...' : 'Choose File'}
+              <input type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={handleFileUpload} />
+            </label>
           </div>
-        )}
 
-        {data.length > 0 && (
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-            <button className={`btn ${activeTab === 'summary' ? 'active' : ''}`} onClick={() => setActiveTab('summary')} style={{ justifyContent: 'flex-start' }}><Activity size={16} /> Summary & Structure</button>
-            <button className={`btn ${activeTab === 'histogram' ? 'active' : ''}`} onClick={() => setActiveTab('histogram')} style={{ justifyContent: 'flex-start' }}><BarChart2 size={16} /> Histogram</button>
-            <button className={`btn ${activeTab === 'scatter' ? 'active' : ''}`} onClick={() => setActiveTab('scatter')} style={{ justifyContent: 'flex-start' }}><ScatterChart size={16} /> Scatter Plot</button>
-            <button className={`btn ${activeTab === 'boxplot' ? 'active' : ''}`} onClick={() => setActiveTab('boxplot')} style={{ justifyContent: 'flex-start' }}><FileBarChart size={16} /> Box Plot</button>
-            <button className={`btn ${activeTab === 'pca' ? 'active' : ''}`} onClick={() => setActiveTab('pca')} style={{ justifyContent: 'flex-start' }}><Activity size={16} /> PCA Analysis</button>
-            <hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '0.5rem 0' }} />
-            <button className="btn" onClick={() => exportElementToPDF('plotmaker-report', 'EDA_Report.pdf')} style={{ justifyContent: 'flex-start' }}><Download size={16} /> Export View as PDF</button>
-          </nav>
-        )}
-      </div>
+          {data.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-secondary)' }}>NA Handling</label>
+              <select className="input-field" value={naAction} onChange={e => setNaAction(e.target.value)}>
+                <option value="none">Keep NAs</option>
+                <option value="na.omit">Remove rows with NA</option>
+                <option value="mean_impute">Mean Impute (Numeric)</option>
+              </select>
+            </div>
+          )}
 
-      {/* MAIN CONTENT */}
-      <div className="glass-panel" id="plotmaker-report" style={{ flex: 1, padding: '2rem', overflowY: 'auto', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column' }}>
+          {data.length > 0 && (
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+              <button className={`btn ${activeTab === 'summary' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('summary')} style={{ justifyContent: 'flex-start' }}><Activity size={16} /> Summary & Structure</button>
+              <button className={`btn ${activeTab === 'histogram' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('histogram')} style={{ justifyContent: 'flex-start' }}><BarChart2 size={16} /> Histogram</button>
+              <button className={`btn ${activeTab === 'scatter' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('scatter')} style={{ justifyContent: 'flex-start' }}><ScatterChart size={16} /> Scatter Plot</button>
+              <button className={`btn ${activeTab === 'boxplot' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('boxplot')} style={{ justifyContent: 'flex-start' }}><FileBarChart size={16} /> Box Plot</button>
+              <button className={`btn ${activeTab === 'pca' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('pca')} style={{ justifyContent: 'flex-start' }}><Activity size={16} /> PCA Analysis</button>
+              <hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '0.5rem 0' }} />
+              <button className="btn btn-secondary" onClick={() => exportElementToPDF('plotmaker-report', 'EDA_Report.pdf')} style={{ justifyContent: 'flex-start' }}><Download size={16} /> Export View as PDF</button>
+            </nav>
+          )}
+        </div>
+      }
+      canvas={
+        <div id="plotmaker-report" style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {data.length === 0 ? (
           <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
             Upload a dataset to begin exploratory data analysis.
@@ -165,7 +170,7 @@ export default function PlotmakerApp() {
                 <p>Rows: {processedData.length} | Columns: {usableCols.length}</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
                   {numericCols.map(col => {
-                    const stats = calculateSummaryStats(processedData.map(r => r[col]));
+                    const stats = calculateSummaryStats(processedData.map(r => r[col] as number | null | undefined));
                     if (!stats) return null;
                     return (
                       <div key={col} className="glass-panel" style={{ padding: '1rem', fontSize: '0.85rem' }}>
@@ -383,7 +388,19 @@ export default function PlotmakerApp() {
 
           </div>
         )}
-      </div>
-    </div>
+        </div>
+      }
+      metrics={
+        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          <div>
+            <strong>Dataset: </strong> 
+            {data.length > 0 ? `${processedData.length} Rows, ${columns.length} Columns` : 'None'}
+          </div>
+          <div>
+            <strong>Numeric: </strong>{numericCols.length} | <strong>Categorical: </strong>{categoricalCols.length}
+          </div>
+        </div>
+      }
+    />
   );
 }

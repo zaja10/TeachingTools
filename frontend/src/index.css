@@ -88,8 +88,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Glassmorphism Panels */
 .glass-panel {
   background: var(--bg-surface);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
@@ -361,8 +361,8 @@ select:disabled {
   left: 0;
   width: 100%;
   background: var(--bg-surface);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border-top: 1px solid var(--border-light);
   padding: 1rem 1.5rem;
   display: flex;

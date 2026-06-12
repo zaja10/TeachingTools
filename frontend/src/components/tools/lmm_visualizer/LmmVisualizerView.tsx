@@ -75,12 +75,12 @@ const LmmVisualizerView: React.FC = () => {
     genotypes.forEach(geno => {
        const yVals = environments.map(env => {
            let pred = data.components.mu;
-           if (modelTerms.genotype === 'fixed') pred += data.components.G_fixed[geno];
-           if (modelTerms.genotype === 'random') pred += data.components.G_random[geno];
-           if (modelTerms.environment === 'fixed') pred += data.components.E_fixed[env];
-           if (modelTerms.environment === 'random') pred += data.components.E_random[env];
-           if (modelTerms.gxe === 'fixed') pred += data.components.GxE_fixed[geno][env];
-           if (modelTerms.gxe === 'random') pred += data.components.GxE_random[geno][env];
+           if (modelTerms.genotype === 'fixed') pred += data.components.G_fixed[geno as keyof typeof data.components.G_fixed];
+           if (modelTerms.genotype === 'random') pred += data.components.G_random[geno as keyof typeof data.components.G_random];
+           if (modelTerms.environment === 'fixed') pred += data.components.E_fixed[env as keyof typeof data.components.E_fixed];
+           if (modelTerms.environment === 'random') pred += data.components.E_random[env as keyof typeof data.components.E_random];
+           if (modelTerms.gxe === 'fixed') pred += data.components.GxE_fixed[geno as keyof typeof data.components.GxE_fixed][env as keyof typeof data.components.GxE_fixed[keyof typeof data.components.GxE_fixed]];
+           if (modelTerms.gxe === 'random') pred += data.components.GxE_random[geno as keyof typeof data.components.GxE_random][env as keyof typeof data.components.GxE_random[keyof typeof data.components.GxE_random]];
            return pred;
        });
        

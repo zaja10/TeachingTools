@@ -30,9 +30,7 @@ const HasseDesignerView: React.FC = () => {
     if (scenario) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFactors(scenario.factors);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUnitFormula(scenario.unitFormula);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTreatFormula(scenario.treatFormula);
     }
   }, [activeScenarioId]);

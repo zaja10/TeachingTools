@@ -1,3 +1,4 @@
+import './InteractiveEllipse.css';
 import React, { useRef, useState, useMemo, useCallback } from 'react';
 
 interface InteractiveEllipseProps {
@@ -131,10 +132,10 @@ export function InteractiveEllipse({
       onMouseEnter={() => onHover && onHover(true)}
       onMouseLeave={() => onHover && onHover(false)}
     >
-      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+      <div className="ie-style-1">
         {traitY} vs {traitX}
       </div>
-      <div style={{ width: '100%', aspectRatio: '1/1', position: 'relative' }}>
+      <div className="ie-style-2">
         <svg
           ref={svgRef}
           width="100%" height="100%"
@@ -169,14 +170,14 @@ export function InteractiveEllipse({
             stroke="white" 
             strokeWidth="1" 
             vectorEffect="non-scaling-stroke"
-            style={{ cursor: 'grab', pointerEvents: 'none' }} // Let pointer events pass to SVG for drag capture
+            className="ie-style-3" // Let pointer events pass to SVG for drag capture
           />
         </svg>
       </div>
-      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.5rem', display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="ie-style-4">
         <div>
           <span>x: {redDot.x.toFixed(2)}</span>
-          <span style={{ marginLeft: '0.5rem' }}>y: {redDot.y.toFixed(2)}</span>
+          <span className="ie-style-5">y: {redDot.y.toFixed(2)}</span>
         </div>
         <button 
           onClick={handleSnapClick}

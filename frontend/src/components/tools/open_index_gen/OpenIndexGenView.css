@@ -1,0 +1,280 @@
+.oig-style-1 {
+  color: var(--text-muted);
+}
+
+.oig-style-2 {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+.oig-style-3 {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  flex: 1px;
+}
+
+.oig-style-4 {
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 1rem;
+}
+
+.oig-style-5 {
+  margin: 0px;
+  font-size: 2rem;
+  color: var(--text-primary);
+}
+
+.oig-style-6 {
+  color: var(--text-muted);
+}
+
+.oig-style-7 {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.oig-style-8 {
+  margin: 0 0 1rem 0;
+  color: #3b82f6;
+  font-size: 1.25rem;
+}
+
+.oig-style-9 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.oig-style-10 {
+  color: var(--text-primary);
+}
+
+.oig-style-11 {
+  color: var(--text-primary);
+}
+
+.oig-style-12 {
+  color: var(--text-primary);
+}
+
+.oig-style-13 {
+  color: var(--text-primary);
+}
+
+.oig-style-14 {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2rem;
+}
+
+.oig-style-15 {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.oig-style-16 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-accent);
+  margin: 0 0 1rem 0;
+}
+
+.oig-style-17 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.oig-style-18 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-accent);
+  margin: 0 0 1rem 0;
+}
+
+.oig-style-19 {
+  width: 100%;
+  padding: 0.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.oig-style-20 {
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
+.oig-style-21 {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.oig-style-22 {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.oig-style-23 {
+  text-align: left;
+  color: var(--text-muted);
+}
+
+.oig-style-24 {
+  padding: 0.5rem;
+}
+
+.oig-style-25 {
+  padding: 0.5rem;
+}
+
+.oig-style-26 {
+  padding: 0.5rem;
+}
+
+.oig-style-27 {
+  padding: 0.5rem;
+}
+
+.oig-style-28 {
+  padding: 0.5rem;
+  color: var(--text-primary);
+}
+
+.oig-style-29 {
+  padding: 0.5rem;
+}
+
+.oig-style-30 {
+  padding: 0.5rem;
+}
+
+.oig-style-31 {
+  width: 60px;
+  padding: 0.2rem;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+}
+
+.oig-style-32 {
+  padding: 0.5rem;
+}
+
+.oig-style-33 {
+  width: 60px;
+  padding: 0.2rem;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+}
+
+.oig-style-34 {
+  margin-top: 1rem;
+}
+
+.oig-style-35 {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.oig-style-36 {
+  width: 100%;
+}
+
+.oig-style-37 {
+  margin: 0 0 1rem 0;
+  color: #10b981;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.oig-style-38 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.oig-style-39 {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.oig-style-40 {
+  font-family: monospace;
+  color: var(--text-primary);
+}
+
+.oig-style-41 {
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.oig-style-42 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+}
+
+.oig-style-43 {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.oig-style-44 {
+  flex: 1px;
+  min-height: 400px;
+}
+
+.oig-style-45 {
+  margin-top: 2rem;
+}
+
+.oig-style-46 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-primary);
+}
+
+.oig-style-47 {
+  font-family: monospace;
+}
+
+.oig-style-48 {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.oig-style-49 {
+  display: none;
+}

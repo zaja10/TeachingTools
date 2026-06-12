@@ -1,9 +1,14 @@
+import './OpenIndexGenView.css';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Database, MousePointerClick, Settings, Activity, HelpCircle, X, Upload, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { InteractiveEllipse } from './InteractiveEllipse';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { OpenIndexGenEngine, type MethodType, type SimulationInput } from './OpenIndexGenEngine';
+import type { PredictedCross } from '../../../engine/crossSelector/crossEngine';
+import { CrossSelectorTable } from './CrossSelectorTable';
+import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
+import './OpenIndexGenView.css';
 
 function calculateCovarianceForTraits(data: Record<string, number[]>, traits: string[]): number[][] {
   const nTraits = traits.length;
@@ -77,6 +82,7 @@ function calculateCovarianceForTraits(data: Record<string, number[]>, traits: st
 
 export default function OpenIndexGenView() {
   const [fullData, setFullData] = useState<Record<string, number[]>>({});
+  const [lineNames, setLineNames] = useState<string[]>([]);
   const [availableTraits, setAvailableTraits] = useState<string[]>([]);
 
   // N-Trait Multi-Select State
@@ -98,7 +104,12 @@ export default function OpenIndexGenView() {
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [activePair, setActivePair] = useState<[string, string] | null>(null);
 
-  // Backend Results State
+  // Web Worker state
+  const [crossRankings, setCrossRankings] = useState<PredictedCross[]>([]);
+  const [isCalculatingCrosses, setIsCalculatingCrosses] = useState(false);
+  const workerRef = useRef<Worker | null>(null);
+
+  // Hardcoded default fallback file
   const [GMatrix, setGMatrix] = useState<number[][] | null>(null);
   const [redDot, setRedDot] = useState<number[] | null>(null);
   const [optimalB, setOptimalB] = useState<number[] | null>(null);
@@ -114,9 +125,17 @@ export default function OpenIndexGenView() {
       !exclude.includes(k) && (typeof firstRow[k] === 'number' || !isNaN(parseFloat(firstRow[k] as string)))
     );
 
-    numericCols.forEach(col => { traitsMap[col] = []; });
+    // Try to find a column that holds line names (often Geno, Line_ID, Taxa, Name)
+    const possibleNameCols = ['Line_ID', 'Geno', 'Taxa', 'Name', 'id'];
+    const stringCols = Object.keys(firstRow).filter(k => !numericCols.includes(k) && !exclude.includes(k));
+    const nameCol = possibleNameCols.find(col => Object.keys(firstRow).includes(col)) || stringCols[0];
 
-    data.forEach(row => {
+    numericCols.forEach(col => { traitsMap[col] = []; });
+    const extractedNames: string[] = [];
+
+    data.forEach((row, idx) => {
+      extractedNames.push(nameCol && row[nameCol] ? String(row[nameCol]) : `Line_${idx + 1}`);
+
       numericCols.forEach(col => {
         const val = row[col];
         if (typeof val === 'number') {
@@ -130,6 +149,7 @@ export default function OpenIndexGenView() {
     });
 
     setFullData(traitsMap);
+    setLineNames(extractedNames);
     setDatasetName(filename);
 
     const available = Object.keys(traitsMap);
@@ -213,7 +233,22 @@ export default function OpenIndexGenView() {
       }
     };
     init();
-    return () => { mounted = false; };
+
+    // Initialize Worker
+    workerRef.current = new Worker(new URL('../../../engine/crossSelector/crossWorker.ts', import.meta.url), { type: 'module' });
+    workerRef.current.onmessage = (e) => {
+      if (e.data.success) {
+        setCrossRankings(e.data.crosses);
+      } else {
+        console.error("Worker error:", e.data.error);
+      }
+      setIsCalculatingCrosses(false);
+    };
+
+    return () => { 
+      mounted = false; 
+      workerRef.current?.terminate();
+    };
   }, [loadDefaultDataset]);
 
   // Handle Dataset Upload
@@ -369,6 +404,27 @@ export default function OpenIndexGenView() {
     }
   };
 
+  useEffect(() => {
+    if (!optimalB || selectedTraits.length < 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCrossRankings([]);
+      return;
+    }
+    
+    setIsCalculatingCrosses(true);
+    // Fallback if lineNames is somehow empty
+    const names = lineNames.length > 0 
+      ? lineNames 
+      : Array.from({length: fullData[selectedTraits[0]]?.length || 0}, (_, i) => `Line_${i+1}`);
+      
+    workerRef.current?.postMessage({
+      fullData,
+      selectedTraits,
+      optimalB,
+      lineNames: names
+    });
+  }, [fullData, selectedTraits, optimalB, lineNames]);
+
   // Handle dragging red dot (Pure Desired Gains)
   const handleRedDotDrag = (idxX: number, idxY: number, newX: number, newY: number) => {
     const plotX = selectedTraits[idxX];
@@ -386,7 +442,7 @@ export default function OpenIndexGenView() {
   // Generate Matrix Grid
   const renderMatrix = () => {
     const N = selectedTraits.length;
-    if (N < 2) return <div style={{ color: 'var(--text-muted)' }}>Select at least 2 traits.</div>;
+    if (N < 2) return <div className="oig-style-1">Select at least 2 traits.</div>;
     if (!redDot || Object.keys(ellipseDataMap).length === 0) return <div>Simulating...</div>;
 
     const pairs = [];
@@ -427,11 +483,11 @@ export default function OpenIndexGenView() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
-        <header style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem' }}>
-          <h1 style={{ margin: 0, fontSize: '2rem', color: 'var(--text-primary)' }}>N-Trait Index & Ellipse Matrix</h1>
-          <p style={{ color: 'var(--text-muted)' }}>
+    <ToolLayoutWrapper
+      header={
+        <div>
+          <h1 className="oig-style-5">N-Trait Index & Ellipse Matrix</h1>
+          <p className="oig-style-6">
             Visualize all pairs of traits simultaneously!
             <br /><strong>Drag the red dot</strong> to smoothly dial in your Desired Gains targets.
             <br /><strong>Click "Snap to Limits"</strong> to auto-calculate the precise Unrestricted economic weights needed to push your selected direction to its theoretical maximum boundary!
@@ -439,54 +495,15 @@ export default function OpenIndexGenView() {
           <button onClick={() => setShowHelp(true)} style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '0.5rem 1rem', borderRadius: '100px', cursor: 'pointer', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.85rem' }}>
             <HelpCircle size={16} /> How is the math calculated?
           </button>
-        </header>
-
-      {showHelp && (
-        <div style={{ padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', position: 'relative' }}>
-          <button title="Close help" aria-label="Close help" onClick={() => setShowHelp(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
-          <h2 style={{ margin: '0 0 1rem 0', color: '#3b82f6', fontSize: '1.25rem' }}>Index Formula Breakdown</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-            <div>
-              <strong style={{ color: 'var(--text-primary)' }}>1. Net Merit (Unrestricted)</strong><br />
-              The standard Hazel (1943) index. Uses your manual economic weights (v).<br />
-              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = P⁻¹ G v</code><br />
-              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', display: 'inline-block' }}>ΔG = (G b) / σᵢ</code>
-            </div>
-            <div>
-              <strong style={{ color: 'var(--text-primary)' }}>2. Restricted Traits (Standard Index)</strong><br />
-              Uses the Kempthorne & Nordskog (1959) approach to force selected traits to have exactly zero genetic change (ΔG = 0).<br />
-              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = [I - P⁻¹ G_c (G_cᵀ P⁻¹ G_c)⁻¹ G_cᵀ] P⁻¹ G v</code>
-            </div>
-            <div>
-              <strong style={{ color: 'var(--text-primary)' }}>3. Pure Desired Gains</strong><br />
-              Uses the Brascamp (1984) approach. Ignores economic weights entirely. It derives the exact index weights (b) needed to reach your target delta (δ).<br />
-              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = P⁻¹ δ</code>
-            </div>
-            <div>
-              <strong style={{ color: 'var(--text-primary)' }}>4. Hybrid Desired Gains</strong><br />
-              Combines both approaches! It restricts some traits to hit a target (δ) while optimizing the remaining traits using your economic weights (v). The proportion (α) blends the solutions.<br />
-              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = (1 - α) b_unrestricted + α b_desired</code>
-            </div>
-          </div>
         </div>
-      )}
-
-      {error && (
-        <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderLeft: '4px solid #ef4444', color: '#ef4444' }}>
-          <strong>Error:</strong> {error}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-
-        {/* LEFT PANEL: Multi-Trait Constraints */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
+      }
+      controls={
+        <div className="oig-style-15">
           <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-accent)', margin: '0 0 1rem 0' }}>
+            <h3 className="oig-style-16">
               <Database size={18} /> Select Traits
             </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div className="oig-style-17">
               {availableTraits.map(t => {
                 const isActive = selectedTraits.includes(t);
                 return (
@@ -510,7 +527,7 @@ export default function OpenIndexGenView() {
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-accent)', margin: '0 0 1rem 0' }}>
+            <h3 className="oig-style-18">
               <Settings size={18} /> Index Paradigm
             </h3>
 
@@ -519,7 +536,7 @@ export default function OpenIndexGenView() {
               onChange={e => setMethod(e.target.value as MethodType)}
               title="Index Paradigm"
               aria-label="Index Paradigm"
-              style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', borderRadius: '4px', marginBottom: '1rem' }}
+              className="oig-style-19"
             >
               <option value="desired_gains">Hybrid Desired Gains</option>
               <option value="pure_desired_gains">Pure Desired Gains</option>
@@ -528,19 +545,19 @@ export default function OpenIndexGenView() {
             </select>
 
             {method === 'unrestricted' && selectedTraits.length > 0 && Object.values(economicWeights).every(v => v === 0 || !v) && (
-              <div className="badge-warning" style={{ marginBottom: '1rem', width: '100%' }}>
+              <div className="badge-warning oig-style-20">
                 Please enter economic weights below to activate this paradigm.
               </div>
             )}
 
-            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <div className="oig-style-21">
+              <table className="oig-style-22">
                 <thead className="table-sticky-header">
-                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
-                    <th style={{ padding: '0.5rem' }}>Trait</th>
-                    {(method === 'restricted' || method === 'desired_gains') && <th style={{ padding: '0.5rem' }}>Restrict</th>}
-                    {method !== 'pure_desired_gains' && <th style={{ padding: '0.5rem' }}>{method === 'desired_gains' ? 'Weight ($v$)' : 'Economic Weight ($v$)'}</th>}
-                    {(method === 'desired_gains' || method === 'pure_desired_gains') && <th style={{ padding: '0.5rem' }}>Target Response ($\Delta G$)</th>}
+                  <tr className="oig-style-23">
+                    <th className="oig-style-24">Trait</th>
+                    {(method === 'restricted' || method === 'desired_gains') && <th className="oig-style-25">Restrict</th>}
+                    {method !== 'pure_desired_gains' && <th className="oig-style-26">{method === 'desired_gains' ? 'Weight ($v$)' : 'Economic Weight ($v$)'}</th>}
+                    {(method === 'desired_gains' || method === 'pure_desired_gains') && <th className="oig-style-27">Target Response ($\Delta G$)</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -548,16 +565,16 @@ export default function OpenIndexGenView() {
                     const isActive = activePair?.includes(t);
                     return (
                       <tr key={t} className={isActive ? 'table-row-active' : ''} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', transition: 'background-color 0.2s' }}>
-                    <td style={{ padding: '0.5rem', color: 'var(--text-primary)' }}>{t}</td>
+                    <td className="oig-style-28">{t}</td>
 
                     {(method === 'restricted' || method === 'desired_gains') && (
-                      <td style={{ padding: '0.5rem' }}>
+                      <td className="oig-style-29">
                         <input type="checkbox" title={`Restrict trait ${t}`} aria-label={`Restrict trait ${t}`} checked={restrictedTraits[t]} onChange={e => setRestrictedTraits(r => ({ ...r, [t]: e.target.checked }))} />
                       </td>
                     )}
 
                     {method !== 'pure_desired_gains' && (
-                      <td style={{ padding: '0.5rem' }}>
+                      <td className="oig-style-30">
                         <input
                           type="number" step="0.1"
                           title={`Economic Weight for ${t}`}
@@ -565,13 +582,13 @@ export default function OpenIndexGenView() {
                           placeholder="0"
                           value={economicWeights[t]}
                           onChange={e => setEconomicWeights(w => ({ ...w, [t]: parseFloat(e.target.value) || 0 }))}
-                          style={{ width: '60px', padding: '0.2rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', borderRadius: '4px' }}
+                          className="oig-style-31"
                         />
                       </td>
                     )}
 
                     {(method === 'desired_gains' || method === 'pure_desired_gains') && (
-                      <td style={{ padding: '0.5rem' }}>
+                      <td className="oig-style-32">
                         <input
                           type="number" step="0.1"
                           title={`Target Response for ${t}`}
@@ -579,7 +596,7 @@ export default function OpenIndexGenView() {
                           placeholder="0"
                           value={desiredGains[t]}
                           onChange={e => setDesiredGains(w => ({ ...w, [t]: parseFloat(e.target.value) || 0 }))}
-                          style={{ width: '60px', padding: '0.2rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', borderRadius: '4px' }}
+                          className="oig-style-33"
                           disabled={method === 'desired_gains' && !restrictedTraits[t]}
                         />
                       </td>
@@ -592,8 +609,8 @@ export default function OpenIndexGenView() {
             </div>
 
             {method === 'desired_gains' && (
-              <div style={{ marginTop: '1rem' }}>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>
+              <div className="oig-style-34">
+                <label className="oig-style-35">
                   Proportional Allocation ($\alpha$): {alpha.toFixed(2)}
                 </label>
                 <input
@@ -601,86 +618,138 @@ export default function OpenIndexGenView() {
                   title="Proportional Allocation"
                   aria-label="Proportional Allocation"
                   value={alpha} onChange={e => setAlpha(parseFloat(e.target.value))}
-                  style={{ width: '100%' }}
+                  className="oig-style-36"
                 />
               </div>
             )}
           </div>
 
           <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '1.5rem', borderRadius: '12px' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#10b981', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 className="oig-style-37">
               <Activity size={18} /> Global Index Weights ($b$)
             </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div className="oig-style-38">
               {selectedTraits.map((t, idx) => (
                 <div key={t} style={{ background: 'rgba(0,0,0,0.1)', padding: '0.5rem', borderRadius: '4px', minWidth: '80px' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t}</div>
-                  <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{optimalB ? optimalB[idx]?.toFixed(4) : '-'}</div>
+                  <div className="oig-style-39">{t}</div>
+                  <div className="oig-style-40">{optimalB ? optimalB[idx]?.toFixed(4) : '-'}</div>
                 </div>
               ))}
             </div>
           </div>
-
         </div>
+      }
+      canvas={
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', overflowY: 'auto' }}>
 
-        {/* RIGHT PANEL: Ellipse Matrix */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px' }}>
+      {showHelp && (
+        <div style={{ padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', position: 'relative' }}>
+          <button title="Close help" aria-label="Close help" onClick={() => setShowHelp(false)} className="oig-style-7"><X size={20} /></button>
+          <h2 className="oig-style-8">Index Formula Breakdown</h2>
+          <div className="oig-style-9">
+            <div>
+              <strong className="oig-style-10">1. Net Merit (Unrestricted)</strong><br />
+              The standard Hazel (1943) index. Uses your manual economic weights (v).<br />
+              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = P⁻¹ G v</code><br />
+              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', display: 'inline-block' }}>ΔG = (G b) / σᵢ</code>
+            </div>
+            <div>
+              <strong className="oig-style-11">2. Restricted Traits (Standard Index)</strong><br />
+              Uses the Kempthorne & Nordskog (1959) approach to force selected traits to have exactly zero genetic change (ΔG = 0).<br />
+              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = [I - P⁻¹ G_c (G_cᵀ P⁻¹ G_c)⁻¹ G_cᵀ] P⁻¹ G v</code>
+            </div>
+            <div>
+              <strong className="oig-style-12">3. Pure Desired Gains</strong><br />
+              Uses the Brascamp (1984) approach. Ignores economic weights entirely. It derives the exact index weights (b) needed to reach your target delta (δ).<br />
+              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = P⁻¹ δ</code>
+            </div>
+            <div>
+              <strong className="oig-style-13">4. Hybrid Desired Gains</strong><br />
+              Combines both approaches! It restricts some traits to hit a target (δ) while optimizing the remaining traits using your economic weights (v). The proportion (α) blends the solutions.<br />
+              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = (1 - α) b_unrestricted + α b_desired</code>
+            </div>
+          </div>
+        </div>
+      )}
 
-          <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+      {error && (
+        <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderLeft: '4px solid #ef4444', color: '#ef4444' }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+
+
+
+          <div className="oig-style-41">
+            <label className="oig-style-42">
               <input type="checkbox" checked={showIsoeconomic} onChange={e => setShowIsoeconomic(e.target.checked)} />
               Show Isoeconomic Lines
             </label>
-            <div style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <div className="oig-style-43">
               <MousePointerClick size={14} /> Drag red dot or click "Snap to Limits"
             </div>
           </div>
 
-          <div style={{ flex: 1, minHeight: '400px' }}>
+          <div className="oig-style-44">
             {renderMatrix()}
           </div>
-
         </div>
-      </div>
-
-      {/* Bottom Global Actions Tray */}
-      <div className="bottom-actions-tray">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-primary)' }}>
-          <FileSpreadsheet size={20} color="var(--color-accent)" />
-          <span>Active Dataset: <strong style={{ fontFamily: 'monospace' }}>{datasetName}</strong></span>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <input
-            type="file"
-            title="Upload Custom BLUPs dataset"
-            aria-label="Upload Custom BLUPs dataset"
-            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            style={{ display: 'none' }}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
-          >
-            <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload Custom BLUPs'}
-          </button>
-
-          {datasetName !== "Tested.parentSelectionFile07.09.2025.xlsx" && (
-            <button
-              onClick={handleResetDataset}
-              disabled={isUploading}
-              className="btn"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(0,0,0,0.05)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
-            >
-              <RefreshCw size={16} /> Reset to Example
-            </button>
+      }
+      metrics={
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {isCalculatingCrosses && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-accent)' }}>
+              <RefreshCw className="spin" size={16} /> Calculating cross rankings...
+            </div>
           )}
+          {crossRankings.length > 0 && !isCalculatingCrosses && (
+            <div className="oig-style-45">
+              <CrossSelectorTable 
+                crosses={crossRankings} 
+                selectedTraits={selectedTraits} 
+              />
+            </div>
+          )}
+          
+          <div className="bottom-actions-tray">
+            <div className="oig-style-46">
+              <FileSpreadsheet size={20} color="var(--color-accent)" />
+              <span>Active Dataset: <strong className="oig-style-47">{datasetName}</strong></span>
+            </div>
+            <div className="oig-style-48">
+              <input
+                type="file"
+                title="Upload Custom BLUPs dataset"
+                aria-label="Upload Custom BLUPs dataset"
+                accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="oig-style-49"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
+              >
+                <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload Custom BLUPs'}
+              </button>
+
+              {datasetName !== "Tested.parentSelectionFile07.09.2025.xlsx" && (
+                <button
+                  onClick={handleResetDataset}
+                  disabled={isUploading}
+                  className="btn btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <RefreshCw size={16} /> Reset to Example
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    </div>
+      }
+    />
   );
 }
