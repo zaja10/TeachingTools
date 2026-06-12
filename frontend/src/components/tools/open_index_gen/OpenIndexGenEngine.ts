@@ -98,7 +98,7 @@ export class OpenIndexGenEngine {
         return b;
     }
 
-    static simulate(inputs: SimulationInput): any {
+    static simulate(inputs: SimulationInput): Record<string, unknown> {
         try {
             const P = new Matrix(inputs.P);
             const G = new Matrix(inputs.G);
@@ -175,19 +175,19 @@ export class OpenIndexGenEngine {
                 weights: b.to1DArray(),
                 predicted_genetic_change: delta_G.to1DArray()
             };
-        } catch (err: any) {
-            return { status: "error", message: err.message || String(err) };
+        } catch (err) {
+            return { status: "error", message: err instanceof Error ? err.message : String(err) };
         }
     }
 
-    static generateGenupEllipse(G_arr: number[][], numPoints: number = 100): any {
+    static generateGenupEllipse(G_arr: number[][], numPoints: number = 100): Record<string, unknown> | { x: number[], y: number[] } {
         const G = new Matrix(G_arr);
         const N = G.rows;
         if (N === 2) {
             return OpenIndexGenEngine._generate2DEllipse(G, numPoints);
         }
         
-        const result: Record<string, any> = {};
+        const result: Record<string, unknown> = {};
         for (let i = 0; i < N; i++) {
             for (let j = i + 1; j < N; j++) {
                 const G2 = G.selection([i, j], [i, j]);
@@ -215,7 +215,7 @@ export class OpenIndexGenEngine {
         return { x: x_pts, y: y_pts };
     }
 
-    static reverseGenupEllipse(G_arr: number[][], target_x: number, target_y: number): any {
+    static reverseGenupEllipse(G_arr: number[][], target_x: number, target_y: number): Record<string, unknown> {
         const G = new Matrix(G_arr);
         const target_dg = Matrix.columnVector([target_x, target_y]);
         const G_inv = pseudoInverse(G);

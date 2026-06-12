@@ -2,7 +2,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
 export interface DataRow {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const parseFile = async (file: File): Promise<DataRow[]> => {
@@ -17,7 +17,7 @@ export const parseFile = async (file: File): Promise<DataRow[]> => {
         complete: (results) => {
           resolve(results.data as DataRow[]);
         },
-        error: (error: any) => {
+        error: (error: Error) => {
           reject(error);
         }
       });

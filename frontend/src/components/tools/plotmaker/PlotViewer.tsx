@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-// @ts-ignore
+// @ts-expect-error Types are not available for plotly.js-dist-min
 import Plotly from 'plotly.js-dist-min';
 
 interface PlotViewerProps {
-  data: any[];
-  layout: any;
+  data: Record<string, unknown>[];
+  layout: Record<string, unknown>;
   title?: string;
-  config?: any;
+  config?: Record<string, unknown>;
 }
 
 const PlotViewer: React.FC<PlotViewerProps> = ({ data, layout, title, config }) => {

@@ -10,10 +10,10 @@ type TabType = 'preprocessing' | 'summary' | 'histogram' | 'scatter' | 'boxplot'
 
 export default function PlotmakerApp() {
   const [activeTab, setActiveTab] = useState<TabType>('preprocessing');
-  const [data, setData] = useState<Record<string, any>[]>([]);
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [pcaResult, setPcaResult] = useState<any>(null);
+  const [pcaResult, setPcaResult] = useState<{ scores: number[][], varianceExplained: number[] } | null>(null);
   const [pcaCols, setPcaCols] = useState<string[]>([]);
   
   // Exclude .row_id from usable columns
@@ -83,12 +83,15 @@ export default function PlotmakerApp() {
 
   // Fallbacks
   React.useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!histVar && numericCols.length > 0) setHistVar(numericCols[0]);
     if (!scatX && numericCols.length > 0) setScatX(numericCols[0]);
     if (!scatY && numericCols.length > 1) setScatY(numericCols[1]);
     if (!boxCat && categoricalCols.length > 0) setBoxCat(categoricalCols[0]);
     if (!boxNum && numericCols.length > 0) setBoxNum(numericCols[0]);
     if (pcaCols.length === 0 && numericCols.length > 0) setPcaCols(numericCols);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numericCols, categoricalCols]);
 
   const togglePcaCol = (col: string) => {
@@ -350,10 +353,10 @@ export default function PlotmakerApp() {
                   {pcaResult && (
                     <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                       <select className="input-field" value={pcaX} onChange={e => setPcaX(e.target.value)}>
-                        {pcaResult.scores[0].map((_: any, i: number) => <option key={i} value={`PC${i+1}`}>PC{i+1}</option>)}
+                        {pcaResult.scores[0].map((_: number, i: number) => <option key={i} value={`PC${i+1}`}>PC{i+1}</option>)}
                       </select>
                       <select className="input-field" value={pcaY} onChange={e => setPcaY(e.target.value)}>
-                        {pcaResult.scores[0].map((_: any, i: number) => <option key={i} value={`PC${i+1}`}>PC{i+1}</option>)}
+                        {pcaResult.scores[0].map((_: number, i: number) => <option key={i} value={`PC${i+1}`}>PC{i+1}</option>)}
                       </select>
                     </div>
                   )}
@@ -361,8 +364,8 @@ export default function PlotmakerApp() {
                   {pcaResult && (() => {
                     const xIdx = parseInt(pcaX.replace('PC', '')) - 1;
                     const yIdx = parseInt(pcaY.replace('PC', '')) - 1;
-                    const xData = pcaResult.scores.map((r: any[]) => r[xIdx]);
-                    const yData = pcaResult.scores.map((r: any[]) => r[yIdx]);
+                    const xData = pcaResult.scores.map((r: number[]) => r[xIdx]);
+                    const yData = pcaResult.scores.map((r: number[]) => r[yIdx]);
                     const varX = pcaResult.varianceExplained[xIdx]?.toFixed(1);
                     const varY = pcaResult.varianceExplained[yIdx]?.toFixed(1);
 
@@ -373,6 +376,7 @@ export default function PlotmakerApp() {
                       />
                     );
                   })()}
+                  </div>
                 </div>
               </div>
             )}

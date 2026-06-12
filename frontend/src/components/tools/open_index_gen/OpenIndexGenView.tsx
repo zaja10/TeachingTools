@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Database, MousePointerClick, Settings, Activity, HelpCircle, X, Upload, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { InteractiveEllipse } from './InteractiveEllipse';
 import * as XLSX from 'xlsx';
@@ -8,7 +8,7 @@ import { OpenIndexGenEngine, type MethodType, type SimulationInput } from './Ope
 function calculateCovarianceForTraits(data: Record<string, number[]>, traits: string[]): number[][] {
   const nTraits = traits.length;
   if (nTraits === 0) return [];
-  
+
   let N = data[traits[0]].length;
   for (const t of traits) {
     if (data[t].length < N) N = data[t].length;
@@ -30,9 +30,9 @@ function calculateCovarianceForTraits(data: Record<string, number[]>, traits: st
   }
 
   const validN = validRows.length;
-  if (validN <= 1) return Array.from({length: nTraits}, () => Array(nTraits).fill(0));
+  if (validN <= 1) return Array.from({ length: nTraits }, () => Array(nTraits).fill(0));
 
-  const cov = Array.from({length: nTraits}, () => Array(nTraits).fill(0));
+  const cov = Array.from({ length: nTraits }, () => Array(nTraits).fill(0));
   const means = Array(nTraits).fill(0);
   for (let i = 0; i < nTraits; i++) {
     for (let k = 0; k < validN; k++) {
@@ -78,16 +78,16 @@ function calculateCovarianceForTraits(data: Record<string, number[]>, traits: st
 export default function OpenIndexGenView() {
   const [fullData, setFullData] = useState<Record<string, number[]>>({});
   const [availableTraits, setAvailableTraits] = useState<string[]>([]);
-  
+
   // N-Trait Multi-Select State
   const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
-  const [method, setMethod] = useState<MethodType>('restricted');
+  const [method, setMethod] = useState<MethodType>('desired_gains');
   const [economicWeights, setEconomicWeights] = useState<Record<string, number>>({});
   const [desiredGains, setDesiredGains] = useState<Record<string, number>>({});
   const [restrictedTraits, setRestrictedTraits] = useState<Record<string, boolean>>({});
   const [alpha, setAlpha] = useState<number>(0.5);
   const cycles = 1;
-  
+
   // Dataset State
   const [datasetName, setDatasetName] = useState<string>("Tested.parentSelectionFile07.09.2025.xlsx");
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -96,56 +96,55 @@ export default function OpenIndexGenView() {
   // Visualization State
   const [showIsoeconomic, setShowIsoeconomic] = useState<boolean>(false);
   const [showHelp, setShowHelp] = useState<boolean>(false);
-  
+
   // Backend Results State
   const [GMatrix, setGMatrix] = useState<number[][] | null>(null);
-  const [ellipseDataMap, setEllipseDataMap] = useState<Record<string, {x: number[], y: number[]}>>({});
   const [redDot, setRedDot] = useState<number[] | null>(null);
   const [optimalB, setOptimalB] = useState<number[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const processParsedData = (data: any[], filename: string) => {
+  const processParsedData = useCallback((data: Record<string, unknown>[], filename: string) => {
     if (data.length === 0) throw new Error("Dataset is empty");
     const traitsMap: Record<string, number[]> = {};
     const exclude = ['Unnamed: 0', 'cohort'];
-    
+
     const firstRow = data[0];
-    const numericCols = Object.keys(firstRow).filter(k => 
-      !exclude.includes(k) && (typeof firstRow[k] === 'number' || !isNaN(parseFloat(firstRow[k])))
+    const numericCols = Object.keys(firstRow).filter(k =>
+      !exclude.includes(k) && (typeof firstRow[k] === 'number' || !isNaN(parseFloat(firstRow[k] as string)))
     );
-    
+
     numericCols.forEach(col => { traitsMap[col] = []; });
-    
+
     data.forEach(row => {
       numericCols.forEach(col => {
         const val = row[col];
         if (typeof val === 'number') {
           traitsMap[col].push(val);
-        } else if (val !== undefined && val !== null && !isNaN(parseFloat(val))) {
-          traitsMap[col].push(parseFloat(val));
+        } else if (val !== undefined && val !== null && !isNaN(parseFloat(val as string))) {
+          traitsMap[col].push(parseFloat(val as string));
         } else {
           traitsMap[col].push(NaN); // Will be filtered out in calculateCovarianceForTraits
         }
       });
     });
-    
+
     setFullData(traitsMap);
     setDatasetName(filename);
-    
+
     const available = Object.keys(traitsMap);
     setAvailableTraits(available);
-    
+
     const numDefaults = Math.min(available.length, 4);
     if (numDefaults > 0) {
       const initial = available.slice(0, numDefaults);
       setSelectedTraits(initial);
-      
+
       const initW: Record<string, number> = {};
       const initD: Record<string, number> = {};
       const initR: Record<string, boolean> = {};
       initial.forEach(t => {
         initW[t] = 1.0;
-        initD[t] = 0.5;
+        initD[t] = 1.0;
         initR[t] = false;
       });
       setEconomicWeights(initW);
@@ -153,18 +152,17 @@ export default function OpenIndexGenView() {
       setRestrictedTraits(initR);
     } else {
       setSelectedTraits([]);
-      setEllipseDataMap({});
     }
-  };
+  }, []);
 
-  const loadDatasetFile = async (fileOrBlob: File | Blob, filename: string) => {
+  const loadDatasetFile = useCallback(async (fileOrBlob: File | Blob, filename: string) => {
     return new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const data = e.target?.result;
-          let parsedData: any[] = [];
-          
+          let parsedData: Record<string, unknown>[] = [];
+
           if (filename.toLowerCase().endsWith('.csv')) {
             const text = new TextDecoder().decode(data as ArrayBuffer);
             Papa.parse(text, {
@@ -172,28 +170,28 @@ export default function OpenIndexGenView() {
               skipEmptyLines: true,
               dynamicTyping: true,
               complete: (results) => {
-                parsedData = results.data;
+                parsedData = results.data as Record<string, unknown>[];
                 processParsedData(parsedData, filename);
                 resolve();
               },
-              error: (err: any) => reject(new Error(err.message))
+              error: (err: Error) => reject(new Error(err.message))
             });
           } else {
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            parsedData = XLSX.utils.sheet_to_json(worksheet);
+            parsedData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
             processParsedData(parsedData, filename);
             resolve();
           }
-        } catch(err) {
+        } catch (err) {
           reject(err);
         }
       };
       reader.onerror = () => reject(new Error("File read error"));
       reader.readAsArrayBuffer(fileOrBlob);
     });
-  };
+  }, [processParsedData]);
 
   const loadDefaultDataset = useCallback(async () => {
     try {
@@ -201,13 +199,20 @@ export default function OpenIndexGenView() {
       if (!response.ok) throw new Error("Failed to fetch default dataset");
       const blob = await response.blob();
       await loadDatasetFile(blob, "Tested.parentSelectionFile07.09.2025.xlsx");
-    } catch(e: any) {
-      setError("Failed to load default dataset: " + e.message);
+    } catch (e) {
+      setError("Failed to load default dataset: " + (e instanceof Error ? e.message : String(e)));
     }
-  }, []);
+  }, [loadDatasetFile]);
 
   useEffect(() => {
-    loadDefaultDataset();
+    let mounted = true;
+    const init = async () => {
+      if (mounted) {
+        await loadDefaultDataset();
+      }
+    };
+    init();
+    return () => { mounted = false; };
   }, [loadDefaultDataset]);
 
   // Handle Dataset Upload
@@ -220,8 +225,8 @@ export default function OpenIndexGenView() {
 
     try {
       await loadDatasetFile(file, file.name);
-    } catch(e: any) {
-      setError(e.message || String(e));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -233,8 +238,8 @@ export default function OpenIndexGenView() {
     setError(null);
     try {
       await loadDefaultDataset();
-    } catch(e: any) {
-      setError(e.message || String(e));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setIsUploading(false);
     }
@@ -249,34 +254,67 @@ export default function OpenIndexGenView() {
         if (next.length >= 10) return prev; // Limit to 10
         next.push(t);
       }
-      
+
       setEconomicWeights(w => ({ ...w, [t]: w[t] ?? 1.0 }));
-      setDesiredGains(d => ({ ...d, [t]: d[t] ?? 0.5 }));
+      setDesiredGains(d => ({ ...d, [t]: d[t] ?? 1.0 }));
       setRestrictedTraits(r => ({ ...r, [t]: r[t] ?? false }));
-      
+
       return next;
     });
   };
 
+  useEffect(() => {
+    if (selectedTraits.length === 0) return;
+
+    setDesiredGains(prev => {
+      const next = { ...prev };
+      let hasChanges = false;
+
+      selectedTraits.forEach(trait => {
+        // If the trait doesn't have a desired gain set yet, default it to 1
+        if (next[trait] === undefined || next[trait] === 0) {
+          next[trait] = 1; 
+          hasChanges = true;
+        }
+      });
+
+      return hasChanges ? next : prev;
+    });
+    
+    // Optionally, default economic weights to 0 so they don't cause NaN if the user switches back
+    setEconomicWeights(prev => {
+      const next = { ...prev };
+      let hasChanges = false;
+      selectedTraits.forEach(trait => {
+        if (next[trait] === undefined) {
+          next[trait] = 0;
+          hasChanges = true;
+        }
+      });
+      return hasChanges ? next : prev;
+    });
+
+  }, [selectedTraits]);
+
   // 2. Simulate when N-Trait state changes
   useEffect(() => {
     if (selectedTraits.length < 2) return;
-    
+
     const runSimulation = () => {
       try {
         setError(null);
-        
+
         // Compute Covariance Matrix locally!
         const G = calculateCovarianceForTraits(fullData, selectedTraits);
         setGMatrix(G);
-        
+
         const restrictIdx: number[] = [];
         selectedTraits.forEach((t, i) => {
           if (restrictedTraits[t]) restrictIdx.push(i);
         });
-        
+
         let finalMethod = method;
-        
+
         if (method === 'restricted' && restrictIdx.length === 0) {
           finalMethod = 'unrestricted';
         }
@@ -286,16 +324,16 @@ export default function OpenIndexGenView() {
 
         const simPayload: SimulationInput = {
           method: finalMethod,
-          P: G, 
+          P: G,
           G: G,
           v: selectedTraits.map(t => economicWeights[t] || 0),
           cycles
         };
-        
+
         if (finalMethod === 'restricted' || finalMethod === 'desired_gains') {
           simPayload.restrict_idx = restrictIdx;
         }
-        
+
         if (finalMethod === 'desired_gains' || finalMethod === 'pure_desired_gains') {
           if (finalMethod === 'pure_desired_gains') {
             simPayload.delta = selectedTraits.map(t => desiredGains[t] || 0);
@@ -307,31 +345,32 @@ export default function OpenIndexGenView() {
 
         const simData = OpenIndexGenEngine.simulate(simPayload);
         if (simData.status === 'error') throw new Error(simData.message);
-        
+
         setRedDot(simData.predicted_genetic_change as number[]);
         setOptimalB(simData.weights as number[]);
-        
-      } catch (e: any) {
-        setError(e.message || String(e));
+
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
       }
     };
-    
+
     // Smooth zero-latency updates!
     runSimulation();
   }, [fullData, selectedTraits, method, economicWeights, desiredGains, restrictedTraits, alpha, cycles]);
 
   // 3. Generate Ellipse Map for all pairs
-  useEffect(() => {
-    if (!GMatrix || selectedTraits.length < 2) return;
+  const ellipseDataMap = useMemo(() => {
+    if (!GMatrix || selectedTraits.length < 2) return {};
     try {
       const data = OpenIndexGenEngine.generateGenupEllipse(GMatrix);
       if (selectedTraits.length === 2) {
-        setEllipseDataMap({ "0_1": data });
+        return { "0_1": data };
       } else {
-        setEllipseDataMap(data);
+        return data;
       }
-    } catch(e: any) {
-      setError(e.message);
+    } catch (e) {
+      console.error(e);
+      return {};
     }
   }, [GMatrix, selectedTraits]);
 
@@ -342,24 +381,23 @@ export default function OpenIndexGenView() {
       [GMatrix[idxX][idxX], GMatrix[idxX][idxY]],
       [GMatrix[idxY][idxX], GMatrix[idxY][idxY]]
     ];
-    
+
     try {
       const revData = OpenIndexGenEngine.reverseGenupEllipse(G2x2, clickX, clickY);
       if (!revData.v || !Array.isArray(revData.v)) return;
-      
+
       const plotX = selectedTraits[idxX];
       const plotY = selectedTraits[idxY];
 
       setMethod('unrestricted');
       setEconomicWeights(prev => {
         const next = { ...prev };
-        selectedTraits.forEach(t => next[t] = 0);
         next[plotX] = revData.v[0] || 0;
         next[plotY] = revData.v[1] || 0;
         return next;
       });
-    } catch(e: any) {
-      setError(e.message || String(e));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -367,11 +405,10 @@ export default function OpenIndexGenView() {
   const handleRedDotDrag = (idxX: number, idxY: number, newX: number, newY: number) => {
     const plotX = selectedTraits[idxX];
     const plotY = selectedTraits[idxY];
-    
+
     setMethod('pure_desired_gains');
     setDesiredGains(prev => {
       const next = { ...prev };
-      selectedTraits.forEach(t => next[t] = 0);
       next[plotX] = newX;
       next[plotY] = newY;
       return next;
@@ -409,9 +446,9 @@ export default function OpenIndexGenView() {
     }
 
     return (
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
         gap: '1rem',
         width: '100%'
       }}>
@@ -425,9 +462,9 @@ export default function OpenIndexGenView() {
       <header style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem' }}>
         <h1 style={{ margin: 0, fontSize: '2rem', color: 'var(--text-primary)' }}>N-Trait Index & Ellipse Matrix</h1>
         <p style={{ color: 'var(--text-muted)' }}>
-          Visualize all pairs of traits simultaneously! 
-          <br/><strong>Drag the red dot</strong> to smoothly dial in your Desired Gains targets. 
-          <br/><strong>Click "Snap to Limits"</strong> to auto-calculate the precise Unrestricted economic weights needed to push your selected direction to its theoretical maximum boundary!
+          Visualize all pairs of traits simultaneously!
+          <br /><strong>Drag the red dot</strong> to smoothly dial in your Desired Gains targets.
+          <br /><strong>Click "Snap to Limits"</strong> to auto-calculate the precise Unrestricted economic weights needed to push your selected direction to its theoretical maximum boundary!
         </p>
         <button onClick={() => setShowHelp(true)} style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '0.5rem 1rem', borderRadius: '100px', cursor: 'pointer', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.85rem' }}>
           <HelpCircle size={16} /> How is the math calculated?
@@ -441,23 +478,23 @@ export default function OpenIndexGenView() {
           <span>Active Dataset: <strong style={{ fontFamily: 'monospace' }}>{datasetName}</strong></span>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <input 
-            type="file" 
-            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-            style={{ display: 'none' }} 
+          <input
+            type="file"
+            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
           />
-          <button 
+          <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'var(--color-accent)', color: 'white', borderRadius: '4px', cursor: isUploading ? 'not-allowed' : 'pointer', border: 'none', fontSize: '0.85rem' }}
           >
             <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload Custom BLUPs'}
           </button>
-          
+
           {datasetName !== "Tested.parentSelectionFile07.09.2025.xlsx" && (
-            <button 
+            <button
               onClick={handleResetDataset}
               disabled={isUploading}
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)', borderRadius: '4px', cursor: isUploading ? 'not-allowed' : 'pointer', border: '1px solid var(--border-light)', fontSize: '0.85rem' }}
@@ -474,24 +511,24 @@ export default function OpenIndexGenView() {
           <h2 style={{ margin: '0 0 1rem 0', color: '#3b82f6', fontSize: '1.25rem' }}>Index Formula Breakdown</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
             <div>
-              <strong style={{ color: 'var(--text-primary)' }}>1. Net Merit (Unrestricted)</strong><br/>
-              The standard Hazel (1943) index. Uses your manual economic weights (v).<br/>
-              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = P⁻¹ G v</code><br/>
+              <strong style={{ color: 'var(--text-primary)' }}>1. Net Merit (Unrestricted)</strong><br />
+              The standard Hazel (1943) index. Uses your manual economic weights (v).<br />
+              <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = P⁻¹ G v</code><br />
               <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', display: 'inline-block' }}>ΔG = (G b) / σᵢ</code>
             </div>
             <div>
-              <strong style={{ color: 'var(--text-primary)' }}>2. Restricted Traits (Standard Index)</strong><br/>
-              Uses the Kempthorne & Nordskog (1959) approach to force selected traits to have exactly zero genetic change (ΔG = 0).<br/>
+              <strong style={{ color: 'var(--text-primary)' }}>2. Restricted Traits (Standard Index)</strong><br />
+              Uses the Kempthorne & Nordskog (1959) approach to force selected traits to have exactly zero genetic change (ΔG = 0).<br />
               <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = [I - P⁻¹ G_c (G_cᵀ P⁻¹ G_c)⁻¹ G_cᵀ] P⁻¹ G v</code>
             </div>
             <div>
-              <strong style={{ color: 'var(--text-primary)' }}>3. Pure Desired Gains</strong><br/>
-              Uses the Brascamp (1984) approach. Ignores economic weights entirely. It derives the exact index weights (b) needed to reach your target delta (δ).<br/>
+              <strong style={{ color: 'var(--text-primary)' }}>3. Pure Desired Gains</strong><br />
+              Uses the Brascamp (1984) approach. Ignores economic weights entirely. It derives the exact index weights (b) needed to reach your target delta (δ).<br />
               <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = P⁻¹ δ</code>
             </div>
             <div>
-              <strong style={{ color: 'var(--text-primary)' }}>4. Hybrid Desired Gains</strong><br/>
-              Combines both approaches! It restricts some traits to hit a target (δ) while optimizing the remaining traits using your economic weights (v). The proportion (α) blends the solutions.<br/>
+              <strong style={{ color: 'var(--text-primary)' }}>4. Hybrid Desired Gains</strong><br />
+              Combines both approaches! It restricts some traits to hit a target (δ) while optimizing the remaining traits using your economic weights (v). The proportion (α) blends the solutions.<br />
               <code style={{ background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.4rem', borderRadius: '4px', marginTop: '0.5rem', display: 'inline-block' }}>b = (1 - α) b_unrestricted + α b_desired</code>
             </div>
           </div>
@@ -505,10 +542,10 @@ export default function OpenIndexGenView() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-        
+
         {/* LEFT PANEL: Multi-Trait Constraints */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
+
           <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-accent)', margin: '0 0 1rem 0' }}>
               <Database size={18} /> Select Traits
@@ -517,7 +554,7 @@ export default function OpenIndexGenView() {
               {availableTraits.map(t => {
                 const isActive = selectedTraits.includes(t);
                 return (
-                  <button 
+                  <button
                     key={t}
                     onClick={() => handleTraitToggle(t)}
                     style={{
@@ -540,16 +577,16 @@ export default function OpenIndexGenView() {
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-accent)', margin: '0 0 1rem 0' }}>
               <Settings size={18} /> Index Paradigm
             </h3>
-            
-            <select 
-              value={method} 
+
+            <select
+              value={method}
               onChange={e => setMethod(e.target.value as MethodType)}
               style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', borderRadius: '4px', marginBottom: '1rem' }}
             >
-              <option value="unrestricted">Net Merit (Unrestricted)</option>
-              <option value="restricted">Restricted Traits</option>
               <option value="desired_gains">Hybrid Desired Gains</option>
               <option value="pure_desired_gains">Pure Desired Gains</option>
+              <option value="unrestricted">Net Merit (Unrestricted)</option>
+              <option value="restricted">Restricted Traits</option>
             </select>
 
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
@@ -565,30 +602,30 @@ export default function OpenIndexGenView() {
                 {selectedTraits.map(t => (
                   <tr key={t} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <td style={{ padding: '0.5rem', color: 'var(--text-primary)' }}>{t}</td>
-                    
+
                     {(method === 'restricted' || method === 'desired_gains') && (
                       <td style={{ padding: '0.5rem' }}>
                         <input type="checkbox" checked={restrictedTraits[t]} onChange={e => setRestrictedTraits(r => ({ ...r, [t]: e.target.checked }))} />
                       </td>
                     )}
-                    
+
                     {method !== 'pure_desired_gains' && (
                       <td style={{ padding: '0.5rem' }}>
-                        <input 
-                          type="number" step="0.1" 
-                          value={economicWeights[t]} 
-                          onChange={e => setEconomicWeights(w => ({ ...w, [t]: parseFloat(e.target.value)||0 }))}
-                          style={{ width: '60px', padding: '0.2rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', borderRadius: '4px' }} 
+                        <input
+                          type="number" step="0.1"
+                          value={economicWeights[t]}
+                          onChange={e => setEconomicWeights(w => ({ ...w, [t]: parseFloat(e.target.value) || 0 }))}
+                          style={{ width: '60px', padding: '0.2rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', borderRadius: '4px' }}
                         />
                       </td>
                     )}
-                    
+
                     {(method === 'desired_gains' || method === 'pure_desired_gains') && (
                       <td style={{ padding: '0.5rem' }}>
-                        <input 
-                          type="number" step="0.1" 
-                          value={desiredGains[t]} 
-                          onChange={e => setDesiredGains(w => ({ ...w, [t]: parseFloat(e.target.value)||0 }))}
+                        <input
+                          type="number" step="0.1"
+                          value={desiredGains[t]}
+                          onChange={e => setDesiredGains(w => ({ ...w, [t]: parseFloat(e.target.value) || 0 }))}
                           style={{ width: '60px', padding: '0.2rem', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', borderRadius: '4px' }}
                           disabled={method === 'desired_gains' && !restrictedTraits[t]}
                         />
@@ -604,9 +641,9 @@ export default function OpenIndexGenView() {
                 <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.5rem' }}>
                   Proportional Allocation ($\alpha$): {alpha.toFixed(2)}
                 </label>
-                <input 
-                  type="range" min="0" max="1" step="0.01" 
-                  value={alpha} onChange={e => setAlpha(parseFloat(e.target.value))} 
+                <input
+                  type="range" min="0" max="1" step="0.01"
+                  value={alpha} onChange={e => setAlpha(parseFloat(e.target.value))}
                   style={{ width: '100%' }}
                 />
               </div>
@@ -614,24 +651,24 @@ export default function OpenIndexGenView() {
           </div>
 
           <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '1.5rem', borderRadius: '12px' }}>
-              <h3 style={{ margin: '0 0 1rem 0', color: '#10b981', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Activity size={18} /> Global Index Weights ($b$)
-              </h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {selectedTraits.map((t, idx) => (
-                  <div key={t} style={{ background: 'rgba(0,0,0,0.1)', padding: '0.5rem', borderRadius: '4px', minWidth: '80px' }}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t}</div>
-                    <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{optimalB ? optimalB[idx]?.toFixed(4) : '-'}</div>
-                  </div>
-                ))}
-              </div>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#10b981', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Activity size={18} /> Global Index Weights ($b$)
+            </h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {selectedTraits.map((t, idx) => (
+                <div key={t} style={{ background: 'rgba(0,0,0,0.1)', padding: '0.5rem', borderRadius: '4px', minWidth: '80px' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t}</div>
+                  <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{optimalB ? optimalB[idx]?.toFixed(4) : '-'}</div>
+                </div>
+              ))}
+            </div>
           </div>
-          
+
         </div>
 
         {/* RIGHT PANEL: Ellipse Matrix */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px' }}>
-          
+
           <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
               <input type="checkbox" checked={showIsoeconomic} onChange={e => setShowIsoeconomic(e.target.checked)} />
@@ -645,7 +682,7 @@ export default function OpenIndexGenView() {
           <div style={{ flex: 1, minHeight: '400px' }}>
             {renderMatrix()}
           </div>
-          
+
         </div>
       </div>
     </div>

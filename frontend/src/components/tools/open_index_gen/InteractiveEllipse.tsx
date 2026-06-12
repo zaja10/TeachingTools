@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useCallback } from 'react';
 
 interface InteractiveEllipseProps {
   traitX: string;
@@ -33,17 +33,17 @@ export function InteractiveEllipse({
     return { maxX, maxY };
   }, [ellipse]);
 
-  const mapToSvg = (valX: number, valY: number, width: number, height: number) => {
+  const mapToSvg = useCallback((valX: number, valY: number, width: number, height: number) => {
     const px = ((valX + bounds.maxX) / (2 * bounds.maxX)) * width;
     const py = (1 - (valY + bounds.maxY) / (2 * bounds.maxY)) * height;
     return { px, py };
-  };
+  }, [bounds]);
 
-  const mapToData = (px: number, py: number, width: number, height: number) => {
+  const mapToData = useCallback((px: number, py: number, width: number, height: number) => {
     const valX = (px / width) * 2 * bounds.maxX - bounds.maxX;
     const valY = (1 - py / height) * 2 * bounds.maxY - bounds.maxY;
     return { valX, valY };
-  };
+  }, [bounds]);
 
   // Convert points for SVG polygon
   const polygonPoints = useMemo(() => {
@@ -51,7 +51,7 @@ export function InteractiveEllipse({
       const { px, py } = mapToSvg(xVal, ellipse.y[i], 100, 100);
       return `${px},${py}`;
     }).join(' ');
-  }, [ellipse, bounds]);
+  }, [ellipse, mapToSvg]);
 
   // Handle Dragging
   const handlePointerDown = (e: React.PointerEvent) => {

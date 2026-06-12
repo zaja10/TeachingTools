@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
 
 import { HasseGraph as HasseGraphComponent } from './components/HasseGraph';
 import { AnovaTable } from './components/AnovaTable';
 import { VisualBuilder } from './components/VisualBuilder';
 import type { Factor } from './engine/Factor';
-import { buildHasseGraph, type HasseGraph } from './engine/Graph';
+import { buildHasseGraph } from './engine/Graph';
 import { parseFormula } from './engine/Parser';
 import { SCENARIOS } from './engine/Scenarios';
 import '@xyflow/react/dist/style.css'; // Ensure React Flow styles are loaded
@@ -20,11 +20,6 @@ const HasseDesignerView: React.FC = () => {
   const [inputMode, setInputMode] = useState<'formula' | 'visual'>('formula');
   const [activeTab, setActiveTab] = useState<'graph' | 'anova'>('graph');
   const [isInputExpanded, setIsInputExpanded] = useState(true);
-  const [parsedTerms, setParsedTerms] = useState<{ unit: any[], treat: any[] } | null>(null);
-  
-  const [graph, setGraph] = useState<HasseGraph | null>(null);
-  const [uGraph, setUGraph] = useState<HasseGraph | null>(null);
-  const [tGraph, setTGraph] = useState<HasseGraph | null>(null);
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, { n?: number, df?: number }>>({});
@@ -33,45 +28,43 @@ const HasseDesignerView: React.FC = () => {
     // When scenario changes, update local states
     const scenario = SCENARIOS.find(s => s.id === activeScenarioId);
     if (scenario) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFactors(scenario.factors);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUnitFormula(scenario.unitFormula);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTreatFormula(scenario.treatFormula);
     }
   }, [activeScenarioId]);
 
-  const handleApplyFormula = useCallback(() => {
+  const parsedTerms = useMemo(() => {
     try {
       const uTerms = unitFormula.trim() ? parseFormula(unitFormula, factors) : [];
       const tTerms = treatFormula.trim() ? parseFormula(treatFormula, factors) : [];
-      setParsedTerms({ unit: uTerms, treat: tTerms });
+      return { unit: uTerms, treat: tTerms };
     } catch (e) {
       console.error(e);
+      return null;
     }
   }, [unitFormula, treatFormula, factors]);
 
-  useEffect(() => {
-    handleApplyFormula();
-  }, [handleApplyFormula]);
+  const { uGraph, tGraph, graph } = useMemo(() => {
+    if (!parsedTerms) return { uGraph: null, tGraph: null, graph: null };
+    
+    const uGraphLocal = parsedTerms.unit.length > 0 ? buildHasseGraph(parsedTerms.unit, overrides, 'Unit_Mean') : { nodes: [], edges: [] };
+    const tGraphLocal = parsedTerms.treat.length > 0 ? buildHasseGraph(parsedTerms.treat, overrides, 'Treat_Mean') : { nodes: [], edges: [] };
 
-  useEffect(() => {
-    if (parsedTerms) {
-      const uGraphLocal = parsedTerms.unit.length > 0 ? buildHasseGraph(parsedTerms.unit, overrides, 'Unit_Mean') : { nodes: [], edges: [] };
-      const tGraphLocal = parsedTerms.treat.length > 0 ? buildHasseGraph(parsedTerms.treat, overrides, 'Treat_Mean') : { nodes: [], edges: [] };
+    const uMean = uGraphLocal.nodes.find(n => n.id === 'Unit_Mean');
+    if (uMean) { uMean.name = 'Y (Unit)'; }
+    const tMean = tGraphLocal.nodes.find(n => n.id === 'Treat_Mean');
+    if (tMean) { tMean.name = 'Y (Treat)'; }
 
-      const uMean = uGraphLocal.nodes.find(n => n.id === 'Unit_Mean');
-      if (uMean) { uMean.name = 'Y (Unit)'; }
-      const tMean = tGraphLocal.nodes.find(n => n.id === 'Treat_Mean');
-      if (tMean) { tMean.name = 'Y (Treat)'; }
-
-      const newGraph = {
-        nodes: [...uGraphLocal.nodes, ...tGraphLocal.nodes],
-        edges: [...uGraphLocal.edges, ...tGraphLocal.edges]
-      };
-      
-      setUGraph(uGraphLocal);
-      setTGraph(tGraphLocal);
-      setGraph(newGraph);
-    }
+    const newGraph = {
+      nodes: [...uGraphLocal.nodes, ...tGraphLocal.nodes],
+      edges: [...uGraphLocal.edges, ...tGraphLocal.edges]
+    };
+    
+    return { uGraph: uGraphLocal, tGraph: tGraphLocal, graph: newGraph };
   }, [parsedTerms, overrides]);
 
   const handleOverrideChange = (id: string, key: 'n' | 'df', value: number | undefined) => {
@@ -164,14 +157,14 @@ const HasseDesignerView: React.FC = () => {
                       <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => {
                         const n = (document.getElementById('factorName') as HTMLInputElement).value;
                         const l = parseInt((document.getElementById('factorLevels') as HTMLInputElement).value);
-                        const t = (document.getElementById('factorType') as HTMLSelectElement).value as any;
+                        const t = (document.getElementById('factorType') as HTMLSelectElement).value as 'Fixed' | 'Random';
                         if(n) setFactors([...factors, { id: Date.now().toString(), name: n, levels: l, type: t }]);
                       }}>+</button>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                     <button className="btn btn-secondary" onClick={() => { handleApplyFormula(); setIsInputExpanded(false); }} style={{ height: '60px', padding: '0 2rem' }}>
+                     <button className="btn btn-secondary" onClick={() => { setIsInputExpanded(false); }} style={{ height: '60px', padding: '0 2rem' }}>
                        Generate
                      </button>
                   </div>

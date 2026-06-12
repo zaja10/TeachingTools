@@ -32,7 +32,7 @@ export function isStrictSubset(a: ModelTerm, b: ModelTerm): boolean {
 
 export function buildHasseGraph(terms: ModelTerm[], overrides: Record<string, { n?: number, df?: number }> = {}, meanId: string = 'Mean'): HasseGraph {
   // Ensure Mean term is always present
-  let allTerms = [...terms];
+  const allTerms = [...terms];
   if (!allTerms.some(t => t.id === meanId)) {
     allTerms.push({
       id: meanId,
@@ -79,7 +79,7 @@ export function buildHasseGraph(terms: ModelTerm[], overrides: Record<string, { 
   const dfMap = new Map<string, number>();
 
   const nodes: HasseNode[] = uniqueTerms.map(term => {
-    let n = 1;
+    let n: number;
     if (overrides[term.id]?.n !== undefined) {
       n = overrides[term.id].n!;
     } else {

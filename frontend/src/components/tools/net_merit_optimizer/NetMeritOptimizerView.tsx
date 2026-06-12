@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import PlotLib from 'react-plotly.js';
-const Plot = (PlotLib as any).default || PlotLib;
+const Plot = (PlotLib as unknown as { default: typeof PlotLib }).default || PlotLib;
 import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
 import { parseFile, extractNumericTraits, findGenotypeColumn, type DataRow } from './utils';
 
@@ -43,8 +43,8 @@ const NetMeritOptimizerView: React.FC = () => {
       // Reset selections
       setSelectedTraits(new Set());
       setWeights({});
-    } catch (err: any) {
-      setError(err.message || "Failed to parse file.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to parse file.");
     }
     
     // Reset file input so same file can be uploaded again if needed
@@ -341,8 +341,8 @@ const NetMeritOptimizerView: React.FC = () => {
                         setTraits(numericTraits);
                         setSelectedTraits(new Set());
                         setWeights({});
-                      } catch (err: any) {
-                        setError(err.message || "Failed to load example file.");
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Failed to load example file.");
                       }
                     }}
                   >
@@ -486,7 +486,7 @@ const NetMeritOptimizerView: React.FC = () => {
             <div style={{ flex: 1, position: 'relative' }}>
               {selectedTraits.size > 0 ? (
                 <Plot
-                  data={plotData as any}
+                  data={plotData as React.ComponentProps<typeof Plot>['data']}
                   layout={{
                     autosize: true,
                     paper_bgcolor: 'rgba(0,0,0,0)',

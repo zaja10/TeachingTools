@@ -2,7 +2,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
 export interface ParseResult {
-  data: Record<string, any>[];
+  data: Record<string, unknown>[];
   columns: string[];
 }
 
@@ -21,13 +21,13 @@ export const parseFile = async (file: File, options?: { header?: boolean, sep?: 
             reject(new Error(results.errors[0].message));
             return;
           }
-          let data = results.data as Record<string, any>[];
+          const data = results.data as Record<string, unknown>[];
           
           // Ensure valid column names and add .row_id
           if (data.length > 0) {
             const columns = Object.keys(data[0]);
             const sanitizedData = data.map((row, index) => {
-               const newRow: Record<string, any> = { '.row_id': index + 1 };
+               const newRow: Record<string, unknown> = { '.row_id': index + 1 };
                columns.forEach(col => {
                  const safeCol = String(col).replace(/[^a-zA-Z0-9_]/g, '_') || 'Column';
                  newRow[safeCol] = row[col];
@@ -51,12 +51,12 @@ export const parseFile = async (file: File, options?: { header?: boolean, sep?: 
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
+          const json = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
           
           if (json.length > 0) {
             const columns = Object.keys(json[0]);
             const sanitizedData = json.map((row, index) => {
-              const newRow: Record<string, any> = { '.row_id': index + 1 };
+              const newRow: Record<string, unknown> = { '.row_id': index + 1 };
               columns.forEach(col => {
                 const safeCol = String(col).replace(/[^a-zA-Z0-9_]/g, '_') || 'Column';
                 newRow[safeCol] = row[col];

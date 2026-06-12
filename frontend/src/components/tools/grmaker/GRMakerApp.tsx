@@ -9,9 +9,9 @@ type TabType = 'qc' | 'grm' | 'pca' | 'match';
 export default function GRMakerApp() {
   const [activeTab, setActiveTab] = useState<TabType>('qc');
   
-  const [snpData, setSnpData] = useState<Record<string, any>[]>([]);
+  const [snpData, setSnpData] = useState<Record<string, unknown>[]>([]);
   const [snpCols, setSnpCols] = useState<string[]>([]);
-  const [phenoData, setPhenoData] = useState<Record<string, any>[]>([]);
+  const [phenoData, setPhenoData] = useState<Record<string, unknown>[]>([]);
   const [phenoCols, setPhenoCols] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -26,7 +26,7 @@ export default function GRMakerApp() {
   const [grmResult, setGrmResult] = useState<{grm: number[][], grmInv: number[][]} | null>(null);
 
   // PCA State
-  const [pcaResult, setPcaResult] = useState<any>(null);
+  const [pcaResult, setPcaResult] = useState<Record<string, unknown> | null>(null);
 
   // Worker Ref
   const workerRef = useRef<Worker | null>(null);
@@ -55,6 +55,7 @@ export default function GRMakerApp() {
       setSnpCols(res.columns);
     } catch (err) {
       alert("Error parsing SNP file. Make sure it is tab-separated.");
+      console.error(err);
     }
     setLoading(false);
   };
@@ -69,6 +70,7 @@ export default function GRMakerApp() {
       setPhenoCols(res.columns);
     } catch (err) {
       alert("Error parsing Pheno file.");
+      console.error(err);
     }
     setLoading(false);
   };
@@ -91,6 +93,7 @@ export default function GRMakerApp() {
       setPhenoCols(phenoParsed.columns);
     } catch (err) {
       alert("Failed to load example data. Ensure they are in the public folder.");
+      console.error(err);
     }
     setLoading(false);
   };
@@ -105,7 +108,7 @@ export default function GRMakerApp() {
     if (snpData.length === 0 || markerCols.length === 0) return null;
     
     // Convert to 2D array
-    let matrix = snpData.map(row => markerCols.map(col => Number(row[col])));
+    const matrix = snpData.map(row => markerCols.map(col => Number(row[col])));
 
     // Filter by Marker Call Rate and MAF
     const numInds = matrix.length;
@@ -273,11 +276,11 @@ export default function GRMakerApp() {
           <div>
             <h3>GRM Calculation</h3>
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <select className="input-field" value={grmMethod} onChange={(e) => setGrmMethod(e.target.value as any)}>
+              <select className="input-field" value={grmMethod} onChange={(e) => setGrmMethod(e.target.value as "VanRaden" | "Yang")}>
                 <option value="VanRaden">VanRaden</option>
                 <option value="Yang">Yang</option>
               </select>
-              <select className="input-field" value={tuneType} onChange={(e) => setTuneType(e.target.value as any)}>
+              <select className="input-field" value={tuneType} onChange={(e) => setTuneType(e.target.value as "None" | "Bend" | "Blend")}>
                 <option value="None">None</option>
                 <option value="Bend">Bend</option>
                 <option value="Blend">Blend</option>
@@ -309,8 +312,8 @@ export default function GRMakerApp() {
               {pcaResult && (
                 <PlotViewer 
                   data={[{ 
-                    x: pcaResult.scores.map((r: any[]) => r[0]), 
-                    y: pcaResult.scores.map((r: any[]) => r[1]), 
+                    x: pcaResult.scores.map((r: number[]) => r[0]), 
+                    y: pcaResult.scores.map((r: number[]) => r[1]), 
                     mode: 'markers', type: 'scatter', marker: { color: '#8b5cf6', size: 8 } 
                   }]} 
                   layout={{ title: `PCA Scatter (PC1 vs PC2)`, xaxis: { title: `PC1 (${pcaResult.varianceExplained[0].toFixed(1)}%)` }, yaxis: { title: `PC2 (${pcaResult.varianceExplained[1].toFixed(1)}%)` } }} 

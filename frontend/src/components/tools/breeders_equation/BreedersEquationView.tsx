@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import PlotLib from 'react-plotly.js';
-const Plot = (PlotLib as any).default || PlotLib;
+const Plot = (PlotLib as unknown as { default: typeof PlotLib }).default || PlotLib;
 import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
 
 const BreedersEquationView: React.FC = () => {
-  const [runs, setRuns] = useState<any[]>([]);
+  const [runs, setRuns] = useState<Record<string, unknown>[]>([]);
   const [runCounter, setRunCounter] = useState(1);
   const [params, setParams] = useState({
     selectionProportion: 10,

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import PlotLib from 'react-plotly.js';
-const Plot = (PlotLib as any).default || PlotLib;
+const Plot = (PlotLib as unknown as { default: typeof PlotLib }).default || PlotLib;
 import ToolLayoutWrapper from '../../layout/ToolLayoutWrapper';
 
 import lmmStaticData from '../../../utils/lmmData.json';
 
 const LmmVisualizerView: React.FC = () => {
-  const [data] = useState<any>(lmmStaticData);
+  const [data] = useState<typeof lmmStaticData>(lmmStaticData);
   
   const [modelTerms, setModelTerms] = useState({
     genotype: 'none',
@@ -46,24 +46,23 @@ const LmmVisualizerView: React.FC = () => {
   const renderPlotlyData = () => {
     if (!data) return [];
     
-    const traces: any[] = [];
+    const traces: Record<string, unknown>[] = [];
     const colors = { "Genotype 1": "#3b82f6", "Genotype 2": "#f97316", "Genotype 3": "#22c55e", "Genotype 4": "#a855f7" };
     const genotypes = ["Genotype 1", "Genotype 2", "Genotype 3", "Genotype 4"];
     const environments = ["Env 1", "Env 2", "Env 3"];
     
-    // Raw scatter points
     genotypes.forEach(geno => {
-      const gPoints = data.points.filter((p: any) => p.genotype === geno);
+      const gPoints = data.points.filter(p => p.genotype === geno);
       
       // Add slight random jitter to x for visibility of raw points
-      const jitteredX = gPoints.map((p: any) => {
+      const jitteredX = gPoints.map(p => {
           const baseIndex = environments.indexOf(p.env);
           return environments[baseIndex]; 
       });
 
       traces.push({
         x: jitteredX,
-        y: gPoints.map((p: any) => p.y),
+        y: gPoints.map(p => p.y),
         mode: 'markers',
         type: 'scatter',
         name: `${geno} (Raw)`,
@@ -108,24 +107,24 @@ const LmmVisualizerView: React.FC = () => {
   const computeMetrics = () => {
     if (!data) return { totalVar: "0.00", modelVar: "0.00", residualVar: "0.00", r2: "0.0" };
     
-    const yAll = data.points.map((p: any) => p.y);
+    const yAll = data.points.map(p => p.y);
     const meanY = yAll.reduce((a: number, b: number) => a + b, 0) / yAll.length;
     const sst = yAll.reduce((sum: number, y: number) => sum + Math.pow(y - meanY, 2), 0);
     const totalVar = sst / (yAll.length - 1);
     
     const yHat: number[] = [];
-    data.points.forEach((p: any) => {
+    data.points.forEach(p => {
         let pred = data.components.mu;
-        if (modelTerms.genotype === 'fixed') pred += data.components.G_fixed[p.genotype];
-        if (modelTerms.genotype === 'random') pred += data.components.G_random[p.genotype];
-        if (modelTerms.environment === 'fixed') pred += data.components.E_fixed[p.env];
-        if (modelTerms.environment === 'random') pred += data.components.E_random[p.env];
-        if (modelTerms.gxe === 'fixed') pred += data.components.GxE_fixed[p.genotype][p.env];
-        if (modelTerms.gxe === 'random') pred += data.components.GxE_random[p.genotype][p.env];
+        if (modelTerms.genotype === 'fixed') pred += data.components.G_fixed[p.genotype as keyof typeof data.components.G_fixed];
+        if (modelTerms.genotype === 'random') pred += data.components.G_random[p.genotype as keyof typeof data.components.G_random];
+        if (modelTerms.environment === 'fixed') pred += data.components.E_fixed[p.env as keyof typeof data.components.E_fixed];
+        if (modelTerms.environment === 'random') pred += data.components.E_random[p.env as keyof typeof data.components.E_random];
+        if (modelTerms.gxe === 'fixed') pred += data.components.GxE_fixed[p.genotype as keyof typeof data.components.GxE_fixed][p.env as keyof typeof data.components.GxE_fixed[keyof typeof data.components.GxE_fixed]];
+        if (modelTerms.gxe === 'random') pred += data.components.GxE_random[p.genotype as keyof typeof data.components.GxE_random][p.env as keyof typeof data.components.GxE_random[keyof typeof data.components.GxE_random]];
         yHat.push(pred);
     });
 
-    const sse = data.points.reduce((sum: number, p: any, i: number) => sum + Math.pow(p.y - yHat[i], 2), 0);
+    const sse = data.points.reduce((sum: number, p, i: number) => sum + Math.pow(p.y - yHat[i], 2), 0);
     const residualVar = sse / (yAll.length - 1);
     const modelVar = totalVar - residualVar;
     const r2 = (totalVar - residualVar) / totalVar * 100;

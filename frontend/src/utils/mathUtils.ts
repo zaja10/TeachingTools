@@ -1,6 +1,6 @@
 import { Matrix, SingularValueDecomposition } from 'ml-matrix';
 
-export const applyTransform = (data: any[], transformType: string): number[] => {
+export const applyTransform = (data: unknown[], transformType: string): number[] => {
   return data.map(val => {
     if (val === null || val === undefined || val === '') return NaN;
     const num = Number(val);
@@ -24,7 +24,7 @@ export const applyTransform = (data: any[], transformType: string): number[] => 
  * @param ncp Number of principal components to return.
  */
 export const calculatePCA = (data: number[][], scale: boolean = true, ncp: number = 2) => {
-  let matrix = new Matrix(data);
+  const matrix = new Matrix(data);
   
   // Center (and optionally scale) the data
   const colMeans = [];

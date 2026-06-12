@@ -14,7 +14,7 @@ export const calculateGRM = (
   method: 'VanRaden' | 'Yang',
   tuneType: 'None' | 'Bend' | 'Blend'
 ) => {
-  let M = new Matrix(snpMatrix);
+  const M = new Matrix(snpMatrix);
   const n = M.rows;
   const m = M.columns;
 
@@ -40,7 +40,7 @@ export const calculateGRM = (
 
   if (method === 'VanRaden') {
     // W = M - P (where P is matrix of 2p)
-    let W = new Matrix(n, m);
+    const W = new Matrix(n, m);
     let sum2pq = 0;
     for (let j = 0; j < m; j++) {
       const p_j = p[j];
@@ -55,7 +55,7 @@ export const calculateGRM = (
     // Simplified Yang approximation for demonstration
     // Usually involves diagonal adjustments, but basic WW' scaling varies.
     // G = W * W' / N_markers
-    let W = new Matrix(n, m);
+    const W = new Matrix(n, m);
     for (let j = 0; j < m; j++) {
       const p_j = p[j];
       const denom = Math.sqrt(2 * p_j * (1 - p_j));

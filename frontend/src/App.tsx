@@ -6,6 +6,7 @@ import { ToolRegistry } from './config/toolRegistry';
 // Assume index.css provides the root variables and base resets
 
 // Explicit lazy imports for Vite bundle analysis
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const componentMap: Record<string, React.LazyExoticComponent<any>> = {
   "breeders_equation/BreedersEquationView": React.lazy(() => import('./components/tools/breeders_equation/BreedersEquationView')),
   "lmm_visualizer/LmmVisualizerView": React.lazy(() => import('./components/tools/lmm_visualizer/LmmVisualizerView')),
